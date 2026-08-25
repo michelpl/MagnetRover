@@ -4,6 +4,7 @@ import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
 import { MenuScene } from './scenes/MenuScene';
 import { ResultScene } from './scenes/ResultScene';
+import { UpgradeScene } from './scenes/UpgradeScene';
 
 export function createGame(): Game {
   return new Game({
@@ -16,6 +17,6 @@ export function createGame(): Game {
       mode: Scale.FIT,
       autoCenter: Scale.CENTER_BOTH,
     },
-    scene: [BootScene, MenuScene, GameScene, ResultScene],
+    scene: [BootScene, MenuScene, GameScene, ResultScene, UpgradeScene],
   });
 }

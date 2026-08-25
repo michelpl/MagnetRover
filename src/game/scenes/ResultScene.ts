@@ -1,5 +1,8 @@
 import { Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
+import { getNextLevelId } from '../config/Levels';
+import { Save } from '../save/Save';
+import { Upgrades } from '../save/Upgrades';
 
 export type ResultPayload = {
   outcome: 'Won' | 'Lost';
@@ -21,6 +24,7 @@ export class ResultScene extends Scene {
     const outcome = payload?.outcome ?? 'Won';
     const clean = Math.floor(payload?.cleanPercentage ?? 0);
     const levelId = payload?.levelId ?? 1;
+    const coins = Save.load().coins;
 
     const { width, height } = GameConfig.viewport;
     this.add.rectangle(width / 2, height / 2, width, height, 0x0d0d10, 0.92);
@@ -30,7 +34,7 @@ export class ResultScene extends Scene {
     const color = isWin ? '#69db7c' : '#fa5252';
 
     this.add
-      .text(width / 2, height / 2 - 160, title, {
+      .text(width / 2, height / 2 - 200, title, {
         fontFamily: 'Arial, sans-serif',
         fontSize: '72px',
         color,
@@ -40,20 +44,36 @@ export class ResultScene extends Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, height / 2 - 40, `Clean ${clean}%`, {
+      .text(width / 2, height / 2 - 80, `Clean ${clean}%`, {
         fontFamily: 'Arial, sans-serif',
         fontSize: '36px',
         color: '#ced4da',
       })
       .setOrigin(0.5);
 
+    this.add
+      .text(width / 2, height / 2 - 20, `Coins: ${coins}`, {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '32px',
+        color: '#ffd43b',
+      })
+      .setOrigin(0.5);
+
     if (isWin) {
-      this.addButton(width / 2, height / 2 + 120, 'Continue', () => {
-        this.registry.set('activeLevelId', levelId);
-        this.scene.start('MenuScene');
+      this.addButton(width / 2, height / 2 + 140, 'Continue', () => {
+        const nextId = getNextLevelId(levelId);
+        Save.update((data) => {
+          data.currentLevel = nextId;
+        });
+        this.registry.set('activeLevelId', nextId);
+        if (Upgrades.isEnabled()) {
+          this.scene.start('UpgradeScene');
+        } else {
+          this.scene.start('GameScene');
+        }
       });
     } else {
-      this.addButton(width / 2, height / 2 + 120, 'Retry', () => {
+      this.addButton(width / 2, height / 2 + 140, 'Retry', () => {
         this.registry.set('activeLevelId', levelId);
         this.scene.start('GameScene');
       });
