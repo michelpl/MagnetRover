@@ -1,0 +1,13 @@
+---
+description: All source, comments, commits, and docs must be in English
+alwaysApply: true
+---
+
+# English language
+
+- Identifiers, comments, commit messages, and project docs are English.
+- Do not write Portuguese (or any other language) in source files.
+- User-facing game copy stays English until an i18n system exists.
+- Keep names concrete: `Rover`, `Scrap`, `Processor`, `magnetRadius`, `magnetAnchor`.
+- Collectibles are metallic cubes; use `color` and `size` for visuals, not gameplay weight.
+- Exception: `MVP.md` may stay in Portuguese as the original spec.

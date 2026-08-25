@@ -1,0 +1,22 @@
+---
+description: Project folder layout and scene/entity/system split
+globs: src/**/*.ts
+alwaysApply: false
+---
+
+# Architecture
+
+Keep game code under `src/game/` as in MVP §23:
+
+- `scenes/` — Phaser scenes (Boot, Game; Menu/Upgrade/Result later)
+- `entities/` — Rover, Scrap (metallic cube), Processor, pickups
+- `systems/` — magnet (rear anchor), cargo queue, energy, progress (no logic dumped in the scene)
+- `config/` — `GameConfig`, later `Levels`
+- `ui/` — HUD widgets
+
+## Rules
+
+- Scenes wire systems and entities. They do not own gameplay math.
+- Put tunables in `GameConfig`. No magic numbers in update loops.
+- One concern per file. Do not grow a god-scene or god-entity.
+- Placeholder folders (`systems/`, `ui/`) stay empty until that feature lands.

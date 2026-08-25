@@ -1,0 +1,15 @@
+---
+description: TypeScript standards for Magnet Rover
+globs: "**/*.ts"
+alwaysApply: false
+---
+
+# TypeScript
+
+- Keep `strict` on. Never use `any`. External data is `unknown` until parsed.
+- Prefer named domain types (`RoverConfig`, `ScrapState`) over inline bags.
+- Model variants with discriminated unions, not optional-field bags.
+- No empty `catch`. Log or rethrow with context.
+- No `as` casts except after a real runtime check.
+- Object arguments for non-hot APIs. Per-frame update may take primitives.
+- Exhaust `switch` on unions with `const _exhaustive: never = x`.

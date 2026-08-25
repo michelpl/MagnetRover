@@ -1,0 +1,16 @@
+---
+description: Phaser 4 arcade patterns for movement, camera, and placeholders
+globs: src/game/**/*.ts
+alwaysApply: false
+---
+
+# Phaser
+
+- Arcade movement: read input, apply speed, lerp velocity/rotation. No realistic acceleration or steering.
+- Camera follows the rover with a small lerp and stays inside map bounds.
+- Clamp the rover to the map. Do not let it leave the world.
+- Use generated Graphics/Container placeholders until art exists.
+- Do not add Arcade Physics (or any physics plugin) unless a later task needs it. Attract cubes to the rear magnet and follow the cargo queue with interpolation.
+- Collectibles are metallic cubes (color + size visual only). Carried cubes form a malleable queue behind the rear magnet — not fixed cargo slots around the rover.
+- Scale is portrait 1080×1920 with `Scale.FIT`.
+- Keep `update(time, delta)` cheap: modest Android devices are the target.

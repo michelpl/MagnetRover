@@ -1,0 +1,24 @@
+---
+description: Magnet Rover MVP premises — hyper-casual arcade, no extra systems
+alwaysApply: true
+---
+
+# Project premises
+
+Magnet Rover is a mobile hyper-casual top-down game. The player drives a small vehicle with a rear magnet, collects metallic cubes of different colors and sizes into a malleable trailing queue, dumps them at a processor, and clears the map before energy runs out.
+
+Follow [MVP.md](MVP.md). Keep scope tight.
+
+## Must
+
+- Arcade feel: simple controls, short sessions, satisfying feedback.
+- Interpolate positions. Do not use realistic physics or steering.
+- Keep levels data-driven (`LevelConfig`) once levels exist.
+- Collectibles are metallic cubes (color + size visual only). Magnet sits at the rear of the rover; carried cubes form a malleable queue behind it.
+- Prioritize feel (speed, magnet radius, trailing cube queue) over extra systems.
+
+## Must not (MVP)
+
+Do not add enemies, combat, complex physics, pathfinding, multiplayer, skill trees, crafting, inventory, quests, regenerative energy, or multiple processor types.
+
+Energy only drains while moving. Capacitor/Android comes later.
