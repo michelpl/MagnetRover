@@ -97,6 +97,14 @@ export const GameConfig = {
     /** Units drained per second of movement at normal play. */
     movementEnergyCost: 4,
   },
+  /** Camera-fixed in-run HUD — keep clear of bottom joystick. */
+  hud: {
+    marginX: 48,
+    marginTop: 48,
+    barWidth: 640,
+    barHeight: 22,
+    barGap: 16,
+  },
 } as const;
 
 /** True only while running under Vite `npm run dev` (not production builds). */
