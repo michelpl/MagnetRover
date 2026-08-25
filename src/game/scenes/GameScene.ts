@@ -1,34 +1,78 @@
 import { Scene } from 'phaser';
-import { GameConfig } from '../config/GameConfig';
+import { GameConfig, isDebugMode } from '../config/GameConfig';
+import type { LevelConfig } from '../config/LevelConfig';
+import { getLevelById } from '../config/Levels';
+import { Processor } from '../entities/Processor';
 import { Rover } from '../entities/Rover';
+import { Scrap } from '../entities/Scrap';
+import { CargoSystem } from '../systems/CargoSystem';
+import { MagnetSystem } from '../systems/MagnetSystem';
+import { DebugSpeedButton } from '../ui/DebugSpeedButton';
+import { VirtualJoystick } from '../ui/VirtualJoystick';
+
+/** Prototype level until menu / level select exists. */
+const ACTIVE_LEVEL_ID = 1;
 
 export class GameScene extends Scene {
+  private level!: LevelConfig;
   private rover!: Rover;
+  private scraps: Scrap[] = [];
+  private cargoSystem!: CargoSystem;
+  private magnetSystem!: MagnetSystem;
+  private joystick!: VirtualJoystick;
 
   public constructor() {
     super('GameScene');
   }
 
   public create(): void {
-    this.drawEmptyMap();
+    this.level = getLevelById(ACTIVE_LEVEL_ID);
+    this.drawEmptyMap(this.level.mapWidth, this.level.mapHeight);
 
     this.rover = new Rover(
       this,
-      GameConfig.map.width / 2,
-      GameConfig.map.height / 2,
+      this.level.mapWidth / 2,
+      this.level.mapHeight / 2,
     );
 
+    this.scraps = this.spawnLevelEntities(this.level);
+    this.cargoSystem = new CargoSystem(this.rover, this.scraps);
+    this.magnetSystem = new MagnetSystem(this.rover, this.scraps, this.cargoSystem);
+
+    this.joystick = new VirtualJoystick(this);
+
     const { lerp } = GameConfig.camera;
-    this.cameras.main.setBounds(0, 0, GameConfig.map.width, GameConfig.map.height);
+    this.cameras.main.setBounds(0, 0, this.level.mapWidth, this.level.mapHeight);
     this.cameras.main.startFollow(this.rover, true, lerp, lerp);
+
+    if (isDebugMode) {
+      new DebugSpeedButton(this, (active) => {
+        this.rover.setSpeedBoostActive(active);
+      });
+    }
   }
 
   public update(_time: number, delta: number): void {
+    const axis = this.joystick.getAxis();
+    this.rover.setJoystickInput(axis.x, axis.y);
     this.rover.updateRover(delta);
+    this.magnetSystem.update(delta);
+    this.cargoSystem.update(delta);
   }
 
-  private drawEmptyMap(): void {
-    const { width, height, gridSize, borderWidth } = GameConfig.map;
+  /** Wire entities from LevelConfig — no attraction or dump math here. */
+  private spawnLevelEntities(level: LevelConfig): Scrap[] {
+    new Processor(this, level.processor.x, level.processor.y);
+
+    const scraps: Scrap[] = [];
+    for (const scrap of level.scraps) {
+      scraps.push(new Scrap(this, scrap.x, scrap.y, scrap.color, scrap.size));
+    }
+    return scraps;
+  }
+
+  private drawEmptyMap(width: number, height: number): void {
+    const { gridSize, borderWidth } = GameConfig.map;
     const { mapFill, mapGrid, mapBorder } = GameConfig.colors;
 
     this.add.rectangle(width / 2, height / 2, width, height, mapFill);
