@@ -10,11 +10,13 @@ import { DumpSystem } from '../systems/DumpSystem';
 import { EnergySystem } from '../systems/EnergySystem';
 import { MagnetSystem } from '../systems/MagnetSystem';
 import { ProgressSystem } from '../systems/ProgressSystem';
+import { RunState } from '../systems/RunState';
 import { CargoIndicator } from '../ui/CargoIndicator';
 import { CleanBar } from '../ui/CleanBar';
 import { DebugSpeedButton } from '../ui/DebugSpeedButton';
 import { EnergyBar } from '../ui/EnergyBar';
 import { VirtualJoystick } from '../ui/VirtualJoystick';
+import type { ResultPayload } from './ResultScene';
 
 /** Prototype level until menu / level select exists. */
 const ACTIVE_LEVEL_ID = 1;
@@ -29,6 +31,7 @@ export class GameScene extends Scene {
   private dumpSystem!: DumpSystem;
   private energySystem!: EnergySystem;
   private progressSystem!: ProgressSystem;
+  private runState!: RunState;
   private energyBar!: EnergyBar;
   private cleanBar!: CleanBar;
   private cargoIndicator!: CargoIndicator;
@@ -65,6 +68,7 @@ export class GameScene extends Scene {
       this.dumpSystem,
       this.scraps.length,
     );
+    this.runState = new RunState();
 
     this.energyBar = new EnergyBar(this);
     this.cleanBar = new CleanBar(this);
@@ -84,6 +88,10 @@ export class GameScene extends Scene {
   }
 
   public update(_time: number, delta: number): void {
+    if (!this.runState.isPlaying) {
+      return;
+    }
+
     const axis = this.joystick.getAxis();
     this.rover.setJoystickInput(axis.x, axis.y);
     this.rover.updateRover(delta);
@@ -98,6 +106,40 @@ export class GameScene extends Scene {
       this.cargoSystem.length,
       GameConfig.rover.capacity,
     );
+
+    this.evaluateRunEnd();
+  }
+
+  private evaluateRunEnd(): void {
+    if (
+      this.progressSystem.remainingObjects === 0 &&
+      this.progressSystem.carriedObjects === 0
+    ) {
+      this.endRun('Won');
+      return;
+    }
+
+    if (this.energySystem.isEmpty) {
+      this.endRun('Lost');
+    }
+  }
+
+  private endRun(outcome: 'Won' | 'Lost'): void {
+    if (outcome === 'Won') {
+      this.runState.win();
+    } else {
+      this.runState.lose();
+    }
+
+    this.rover.setJoystickInput(0, 0);
+
+    const payload: ResultPayload = {
+      outcome,
+      cleanPercentage: this.progressSystem.getCleanPercentage(),
+      levelId: this.level.id,
+    };
+    this.registry.set('resultPayload', payload);
+    this.scene.start('ResultScene');
   }
 
   /** Wire entities from LevelConfig — no attraction or dump math here. */
