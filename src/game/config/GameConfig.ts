@@ -29,6 +29,8 @@ export const GameConfig = {
     bodyWidth: 96,
     bodyHeight: 80,
     padRadius: 70,
+    /** Delay between sequential scrap dumps (ms); keep in the 20–60 feel range. */
+    dumpIntervalMs: 40,
   },
   rover: {
     speed: 280,

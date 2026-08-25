@@ -6,6 +6,7 @@ import { Processor } from '../entities/Processor';
 import { Rover } from '../entities/Rover';
 import { Scrap } from '../entities/Scrap';
 import { CargoSystem } from '../systems/CargoSystem';
+import { DumpSystem } from '../systems/DumpSystem';
 import { MagnetSystem } from '../systems/MagnetSystem';
 import { DebugSpeedButton } from '../ui/DebugSpeedButton';
 import { VirtualJoystick } from '../ui/VirtualJoystick';
@@ -16,9 +17,11 @@ const ACTIVE_LEVEL_ID = 1;
 export class GameScene extends Scene {
   private level!: LevelConfig;
   private rover!: Rover;
+  private processor!: Processor;
   private scraps: Scrap[] = [];
   private cargoSystem!: CargoSystem;
   private magnetSystem!: MagnetSystem;
+  private dumpSystem!: DumpSystem;
   private joystick!: VirtualJoystick;
 
   public constructor() {
@@ -39,6 +42,12 @@ export class GameScene extends Scene {
     this.cargoSystem = new CargoSystem(this.rover, this.scraps);
     this.magnetSystem = new MagnetSystem(this.rover, this.scraps, this.cargoSystem);
     this.magnetSystem.setCanAttract(() => this.cargoSystem.canAccept());
+    this.dumpSystem = new DumpSystem(
+      this.rover,
+      this.processor,
+      this.cargoSystem,
+      this.scraps,
+    );
 
     this.joystick = new VirtualJoystick(this);
 
@@ -59,11 +68,12 @@ export class GameScene extends Scene {
     this.rover.updateRover(delta);
     this.magnetSystem.update(delta);
     this.cargoSystem.update(delta);
+    this.dumpSystem.update(delta);
   }
 
   /** Wire entities from LevelConfig — no attraction or dump math here. */
   private spawnLevelEntities(level: LevelConfig): Scrap[] {
-    new Processor(this, level.processor.x, level.processor.y);
+    this.processor = new Processor(this, level.processor.x, level.processor.y);
 
     const scraps: Scrap[] = [];
     for (const scrap of level.scraps) {

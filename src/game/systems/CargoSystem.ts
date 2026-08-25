@@ -56,6 +56,11 @@ export class CargoSystem {
     return detached;
   }
 
+  /** Remove and return the front of the queue (nearest the magnet) for dumping. */
+  public shiftFront(): Scrap | undefined {
+    return this.cargo.shift();
+  }
+
   /**
    * Attracted scraps close enough to magnet / tip become Carried;
    * then each carried cube lerps toward the previous segment.
