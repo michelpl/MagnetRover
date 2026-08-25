@@ -7,6 +7,7 @@ import { Rover } from '../entities/Rover';
 import { Scrap } from '../entities/Scrap';
 import { CargoSystem } from '../systems/CargoSystem';
 import { DumpSystem } from '../systems/DumpSystem';
+import { EnergySystem } from '../systems/EnergySystem';
 import { MagnetSystem } from '../systems/MagnetSystem';
 import { DebugSpeedButton } from '../ui/DebugSpeedButton';
 import { VirtualJoystick } from '../ui/VirtualJoystick';
@@ -22,6 +23,7 @@ export class GameScene extends Scene {
   private cargoSystem!: CargoSystem;
   private magnetSystem!: MagnetSystem;
   private dumpSystem!: DumpSystem;
+  private energySystem!: EnergySystem;
   private joystick!: VirtualJoystick;
 
   public constructor() {
@@ -48,6 +50,7 @@ export class GameScene extends Scene {
       this.cargoSystem,
       this.scraps,
     );
+    this.energySystem = new EnergySystem(this.level.initialEnergy);
 
     this.joystick = new VirtualJoystick(this);
 
@@ -69,6 +72,7 @@ export class GameScene extends Scene {
     this.magnetSystem.update(delta);
     this.cargoSystem.update(delta);
     this.dumpSystem.update(delta);
+    this.energySystem.update(delta, this.rover.isMoving);
   }
 
   /** Wire entities from LevelConfig — no attraction or dump math here. */

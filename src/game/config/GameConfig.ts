@@ -92,6 +92,11 @@ export const GameConfig = {
   debug: {
     boostSpeed: 800,
   },
+  /** Drain only while moving — percent (or absolute units matching LevelConfig) per second. */
+  energy: {
+    /** Units drained per second of movement at normal play. */
+    movementEnergyCost: 4,
+  },
 } as const;
 
 /** True only while running under Vite `npm run dev` (not production builds). */
