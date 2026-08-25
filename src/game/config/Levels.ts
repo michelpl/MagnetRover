@@ -13,25 +13,11 @@ const SCRAP_COLORS = [
 
 const SCRAP_SIZES: readonly ScrapSize[] = ['small', 'medium', 'large'];
 
-/** Workshop-style clusters across 2000×3000 — open lanes, not mazes. */
-const PROTOTYPE_CLUSTERS: readonly { cx: number; cy: number; count: number; spread: number }[] =
-  [
-    { cx: 380, cy: 720, count: 16, spread: 220 },
-    { cx: 1620, cy: 720, count: 16, spread: 220 },
-    { cx: 380, cy: 1500, count: 14, spread: 200 },
-    { cx: 1620, cy: 1500, count: 14, spread: 200 },
-    { cx: 1000, cy: 2100, count: 16, spread: 260 },
-    { cx: 420, cy: 2650, count: 12, spread: 180 },
-    { cx: 1580, cy: 2650, count: 12, spread: 180 },
-  ];
+type Cluster = { cx: number; cy: number; count: number; spread: number };
 
 const PROCESSOR_CLEAR_RADIUS = 200;
 const MAP_MARGIN = 90;
 
-/**
- * Deterministic 0..1 PRNG so level layout is stable across reloads
- * without baking 100 hand-written coordinates.
- */
 function createRng(seed: number): () => number {
   let state = seed % 2147483647;
   if (state <= 0) {
@@ -43,18 +29,21 @@ function createRng(seed: number): () => number {
   };
 }
 
-function buildPrototypeScraps(
+function buildScraps(
   mapWidth: number,
   mapHeight: number,
   processorX: number,
   processorY: number,
+  clusters: readonly Cluster[],
+  seed: number,
+  expectedCount: number,
 ): LevelScrap[] {
-  const rand = createRng(1007);
+  const rand = createRng(seed);
   const scraps: LevelScrap[] = [];
   const clearR2 = PROCESSOR_CLEAR_RADIUS * PROCESSOR_CLEAR_RADIUS;
 
-  for (let regionId = 0; regionId < PROTOTYPE_CLUSTERS.length; regionId += 1) {
-    const cluster = PROTOTYPE_CLUSTERS[regionId];
+  for (let regionId = 0; regionId < clusters.length; regionId += 1) {
+    const cluster = clusters[regionId];
     let placed = 0;
     let attempts = 0;
     const maxAttempts = cluster.count * 40;
@@ -90,39 +79,80 @@ function buildPrototypeScraps(
     }
   }
 
+  if (scraps.length !== expectedCount) {
+    throw new Error(`Expected ${expectedCount} scraps, got ${scraps.length}`);
+  }
   return scraps;
 }
 
-const PROTOTYPE_MAP_WIDTH = 2000;
-const PROTOTYPE_MAP_HEIGHT = 3000;
-/** Landmark near top-center — clear path down to rover spawn at map center. */
-const PROTOTYPE_PROCESSOR = { x: 1000, y: 380 };
+/** Level 1: 2000×3000 workshop clusters, 100 cubes. */
+const level1Clusters: readonly Cluster[] = [
+  { cx: 380, cy: 720, count: 16, spread: 220 },
+  { cx: 1620, cy: 720, count: 16, spread: 220 },
+  { cx: 380, cy: 1500, count: 14, spread: 200 },
+  { cx: 1620, cy: 1500, count: 14, spread: 200 },
+  { cx: 1000, cy: 2100, count: 16, spread: 260 },
+  { cx: 420, cy: 2650, count: 12, spread: 180 },
+  { cx: 1580, cy: 2650, count: 12, spread: 180 },
+];
 
-const prototypeScraps = buildPrototypeScraps(
-  PROTOTYPE_MAP_WIDTH,
-  PROTOTYPE_MAP_HEIGHT,
-  PROTOTYPE_PROCESSOR.x,
-  PROTOTYPE_PROCESSOR.y,
-);
+/** Level 2: wider yard, side lanes, 90 cubes. */
+const level2Clusters: readonly Cluster[] = [
+  { cx: 500, cy: 600, count: 18, spread: 240 },
+  { cx: 1900, cy: 600, count: 18, spread: 240 },
+  { cx: 1200, cy: 1400, count: 20, spread: 320 },
+  { cx: 500, cy: 2200, count: 17, spread: 220 },
+  { cx: 1900, cy: 2200, count: 17, spread: 220 },
+];
 
-if (prototypeScraps.length !== 100) {
-  throw new Error(
-    `Prototype level expected 100 scraps, got ${prototypeScraps.length}`,
-  );
-}
+/** Level 3: taller map, ring around center processor approach, 110 cubes. */
+const level3Clusters: readonly Cluster[] = [
+  { cx: 400, cy: 900, count: 15, spread: 200 },
+  { cx: 1700, cy: 900, count: 15, spread: 200 },
+  { cx: 400, cy: 1800, count: 18, spread: 240 },
+  { cx: 1700, cy: 1800, count: 18, spread: 240 },
+  { cx: 1050, cy: 2600, count: 22, spread: 300 },
+  { cx: 1050, cy: 3400, count: 22, spread: 280 },
+];
 
-/** First playable level: 2000×3000, 100 cubes, 1 processor, no pickups. */
 export const prototypeLevel: LevelConfig = {
   id: 1,
-  mapWidth: PROTOTYPE_MAP_WIDTH,
-  mapHeight: PROTOTYPE_MAP_HEIGHT,
+  mapWidth: 2000,
+  mapHeight: 3000,
   initialEnergy: 100,
-  processor: PROTOTYPE_PROCESSOR,
-  scraps: prototypeScraps,
+  processor: { x: 1000, y: 380 },
+  scraps: buildScraps(2000, 3000, 1000, 380, level1Clusters, 1007, 100),
   powerUps: [],
 };
 
-export const levels: readonly LevelConfig[] = [prototypeLevel];
+export const yardLevel: LevelConfig = {
+  id: 2,
+  mapWidth: 2400,
+  mapHeight: 2800,
+  initialEnergy: 110,
+  processor: { x: 1200, y: 320 },
+  scraps: buildScraps(2400, 2800, 1200, 320, level2Clusters, 2049, 90),
+  powerUps: [
+    { x: 1200, y: 1400, type: 'energy' },
+    { x: 500, y: 2200, type: 'energy' },
+  ],
+};
+
+export const junkyardLevel: LevelConfig = {
+  id: 3,
+  mapWidth: 2100,
+  mapHeight: 3600,
+  initialEnergy: 120,
+  processor: { x: 1050, y: 400 },
+  scraps: buildScraps(2100, 3600, 1050, 400, level3Clusters, 3331, 110),
+  powerUps: [
+    { x: 1050, y: 1800, type: 'energy' },
+    { x: 400, y: 2600, type: 'energy' },
+    { x: 1700, y: 2600, type: 'energy' },
+  ],
+};
+
+export const levels: readonly LevelConfig[] = [prototypeLevel, yardLevel, junkyardLevel];
 
 export function getLevelById(id: number): LevelConfig {
   const level = levels.find((entry) => entry.id === id);
@@ -130,4 +160,16 @@ export function getLevelById(id: number): LevelConfig {
     throw new Error(`Unknown level id: ${id}`);
   }
   return level;
+}
+
+export function getNextLevelId(currentId: number): number {
+  const index = levels.findIndex((entry) => entry.id === currentId);
+  if (index < 0 || index >= levels.length - 1) {
+    return levels[levels.length - 1]?.id ?? currentId;
+  }
+  return levels[index + 1].id;
+}
+
+export function getMaxLevelId(): number {
+  return levels[levels.length - 1]?.id ?? 1;
 }
