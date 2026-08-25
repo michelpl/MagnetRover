@@ -4,6 +4,7 @@ import { GameConfig } from '../config/GameConfig';
 import type { Processor } from '../entities/Processor';
 import type { Rover } from '../entities/Rover';
 import type { Scrap } from '../entities/Scrap';
+import { Upgrades } from '../save/Upgrades';
 import type { CargoSystem } from './CargoSystem';
 
 /**
@@ -113,6 +114,8 @@ export class DumpSystem {
     }
     scrap.destroy();
     this.processedCount += 1;
+    // Persist 1 coin per processed scrap immediately (US-028); retry keeps earned coins.
+    Upgrades.addCoins(1);
     this.onProcessed?.();
   }
 }

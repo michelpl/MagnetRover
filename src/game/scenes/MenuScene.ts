@@ -1,5 +1,6 @@
 import { Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
+import { Save } from '../save/Save';
 
 /** Title screen: Play starts the current level (US-021). */
 export class MenuScene extends Scene {
@@ -9,6 +10,7 @@ export class MenuScene extends Scene {
 
   public create(): void {
     const { width, height } = GameConfig.viewport;
+    const save = Save.load();
 
     this.add.rectangle(width / 2, height / 2, width, height, GameConfig.colors.background);
 
@@ -30,6 +32,14 @@ export class MenuScene extends Scene {
       })
       .setOrigin(0.5);
 
+    this.add
+      .text(width / 2, height / 2 - 40, `Coins: ${save.coins}`, {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '28px',
+        color: '#ffd43b',
+      })
+      .setOrigin(0.5);
+
     const playBg = this.add
       .rectangle(width / 2, height / 2 + 80, 360, 90, GameConfig.colors.magnetGlow, 1)
       .setInteractive({ useHandCursor: true });
@@ -42,8 +52,7 @@ export class MenuScene extends Scene {
       .setOrigin(0.5);
 
     const startGame = (): void => {
-      const levelId = (this.registry.get('activeLevelId') as number | undefined) ?? 1;
-      this.registry.set('activeLevelId', levelId);
+      this.registry.set('activeLevelId', save.currentLevel);
       this.scene.start('GameScene');
     };
 
