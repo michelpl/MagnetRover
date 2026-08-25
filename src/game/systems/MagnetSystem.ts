@@ -1,4 +1,5 @@
 import { GameObjects } from 'phaser';
+import { Audio } from '../audio/Audio';
 import { GameConfig } from '../config/GameConfig';
 import type { Rover } from '../entities/Rover';
 import type { Scrap } from '../entities/Scrap';
@@ -31,9 +32,12 @@ export class MagnetSystem {
     this.drawRadius(magnet.x, magnet.y);
 
     const tip = this.cargo.getQueueTip(magnet);
-    const { magnetRadius, attractionSpeed } = GameConfig.magnet;
+    const { magnetRadius, attractionSpeed, attractionBoost, spinDegPerSec } =
+      GameConfig.magnet;
     const radiusSq = magnetRadius * magnetRadius;
-    const t = 1 - Math.pow(1 - attractionSpeed, delta / 16.6667);
+    const boosted = attractionSpeed * attractionBoost;
+    const t = 1 - Math.pow(1 - boosted, delta / 16.6667);
+    const spin = spinDegPerSec * (delta / 1000);
 
     for (const scrap of this.scraps) {
       if (scrap.state === 'Idle') {
@@ -44,12 +48,15 @@ export class MagnetSystem {
         const dy = scrap.y - magnet.y;
         if (dx * dx + dy * dy <= radiusSq) {
           scrap.state = 'Attracted';
+          scrap.setAttractGlow(true);
+          Audio.play('attract', 0.35);
         }
       }
 
       if (scrap.state === 'Attracted') {
         scrap.x += (tip.x - scrap.x) * t;
         scrap.y += (tip.y - scrap.y) * t;
+        scrap.angle += spin;
       }
     }
   }

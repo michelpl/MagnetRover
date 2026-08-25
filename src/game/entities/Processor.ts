@@ -20,6 +20,27 @@ export class Processor extends GameObjects.Container {
     return this.processingArea.contains(x, y);
   }
 
+  /** Pulse landmark while cargo is full (US-025). */
+  public setHintPulse(active: boolean): void {
+    const scene = this.scene;
+    if (active) {
+      if (!scene.tweens.isTweening(this)) {
+        scene.tweens.add({
+          targets: this,
+          scaleX: 1.08,
+          scaleY: 1.08,
+          duration: 320,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+      }
+    } else {
+      scene.tweens.killTweensOf(this);
+      this.setScale(1);
+    }
+  }
+
   private drawMachine(): void {
     const { processorBody, processorAccent, processorPad } = GameConfig.colors;
     const { bodyWidth, bodyHeight, padRadius, areaRadius } = GameConfig.processor;

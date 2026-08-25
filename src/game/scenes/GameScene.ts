@@ -1,4 +1,5 @@
 import { Scene } from 'phaser';
+import { Audio } from '../audio/Audio';
 import { GameConfig, isDebugMode } from '../config/GameConfig';
 import type { LevelConfig } from '../config/LevelConfig';
 import { getLevelById } from '../config/Levels';
@@ -10,6 +11,7 @@ import { DumpSystem } from '../systems/DumpSystem';
 import { EnergySystem } from '../systems/EnergySystem';
 import { MagnetSystem } from '../systems/MagnetSystem';
 import { ProgressSystem } from '../systems/ProgressSystem';
+import { RegionClearSystem } from '../systems/RegionClearSystem';
 import { RunState } from '../systems/RunState';
 import { CargoIndicator } from '../ui/CargoIndicator';
 import { CleanBar } from '../ui/CleanBar';
@@ -31,6 +33,7 @@ export class GameScene extends Scene {
   private dumpSystem!: DumpSystem;
   private energySystem!: EnergySystem;
   private progressSystem!: ProgressSystem;
+  private regionClearSystem!: RegionClearSystem;
   private runState!: RunState;
   private energyBar!: EnergyBar;
   private cleanBar!: CleanBar;
@@ -42,6 +45,7 @@ export class GameScene extends Scene {
   }
 
   public create(): void {
+    Audio.bind(this);
     const levelId =
       (this.registry.get('activeLevelId') as number | undefined) ?? DEFAULT_LEVEL_ID;
     this.registry.set('activeLevelId', levelId);
@@ -56,6 +60,7 @@ export class GameScene extends Scene {
 
     this.scraps = this.spawnLevelEntities(this.level);
     this.cargoSystem = new CargoSystem(this.rover, this.scraps);
+    this.cargoSystem.setProcessor(this.processor);
     this.magnetSystem = new MagnetSystem(this.rover, this.scraps, this.cargoSystem);
     this.magnetSystem.setCanAttract(() => this.cargoSystem.canAccept());
     this.dumpSystem = new DumpSystem(
@@ -71,6 +76,10 @@ export class GameScene extends Scene {
       this.dumpSystem,
       this.scraps.length,
     );
+    this.regionClearSystem = new RegionClearSystem(this, this.scraps);
+    this.dumpSystem.setOnProcessed(() => {
+      this.regionClearSystem.check(this.scraps);
+    });
     this.runState = new RunState();
 
     this.energyBar = new EnergyBar(this);
@@ -151,7 +160,9 @@ export class GameScene extends Scene {
 
     const scraps: Scrap[] = [];
     for (const scrap of level.scraps) {
-      scraps.push(new Scrap(this, scrap.x, scrap.y, scrap.color, scrap.size));
+      scraps.push(
+        new Scrap(this, scrap.x, scrap.y, scrap.color, scrap.size, scrap.regionId ?? 0),
+      );
     }
     return scraps;
   }

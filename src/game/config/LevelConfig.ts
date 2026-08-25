@@ -6,6 +6,8 @@ export type LevelScrap = {
   y: number;
   color: string;
   size: ScrapSize;
+  /** Optional cluster id for region-clear feedback (US-026). */
+  regionId?: number;
 };
 
 export type LevelProcessor = {
