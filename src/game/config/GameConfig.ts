@@ -99,6 +99,8 @@ export const GameConfig = {
   energy: {
     /** Units drained per second of movement at normal play. */
     movementEnergyCost: 4,
+    /** Fraction of max energy restored by one EnergyPickup (US-034). */
+    pickupBonusRatio: 0.2,
   },
   /** Camera-fixed in-run HUD — keep clear of bottom joystick. */
   hud: {
@@ -107,6 +109,25 @@ export const GameConfig = {
     barWidth: 640,
     barHeight: 22,
     barGap: 16,
+  },
+  /**
+   * Capacity / magnet / speed tiers (US-030).
+   * Tier index 0 is the base value; costs[i] buys the next value.
+   */
+  upgrades: {
+    enabled: true,
+    capacity: {
+      values: [20, 25, 30, 40],
+      costs: [100, 250, 500],
+    },
+    magnetRadius: {
+      values: [100, 120, 145, 175],
+      costs: [100, 250, 500],
+    },
+    speed: {
+      values: [200, 215, 230, 250],
+      costs: [100, 250, 500],
+    },
   },
 } as const;
 

@@ -12,6 +12,7 @@ import type { CargoSystem } from './CargoSystem';
 export class MagnetSystem {
   private readonly radiusGraphics: GameObjects.Graphics;
   private canAttractFn: () => boolean = () => true;
+  private magnetRadius: number = GameConfig.magnet.magnetRadius;
 
   public constructor(
     private readonly rover: Rover,
@@ -20,6 +21,10 @@ export class MagnetSystem {
   ) {
     this.radiusGraphics = rover.scene.add.graphics();
     this.radiusGraphics.setDepth(this.rover.depth - 1);
+  }
+
+  public setMagnetRadius(radius: number): void {
+    this.magnetRadius = radius;
   }
 
   /** Hook for capacity (US-011). When false, Idle scraps are not pulled. */
@@ -32,9 +37,8 @@ export class MagnetSystem {
     this.drawRadius(magnet.x, magnet.y);
 
     const tip = this.cargo.getQueueTip(magnet);
-    const { magnetRadius, attractionSpeed, attractionBoost, spinDegPerSec } =
-      GameConfig.magnet;
-    const radiusSq = magnetRadius * magnetRadius;
+    const { attractionSpeed, attractionBoost, spinDegPerSec } = GameConfig.magnet;
+    const radiusSq = this.magnetRadius * this.magnetRadius;
     const boosted = attractionSpeed * attractionBoost;
     const t = 1 - Math.pow(1 - boosted, delta / 16.6667);
     const spin = spinDegPerSec * (delta / 1000);
@@ -62,13 +66,13 @@ export class MagnetSystem {
   }
 
   private drawRadius(x: number, y: number): void {
-    const { magnetRadius, radiusAlpha } = GameConfig.magnet;
+    const { radiusAlpha } = GameConfig.magnet;
     const { magnetGlow } = GameConfig.colors;
 
     this.radiusGraphics.clear();
     this.radiusGraphics.lineStyle(2, magnetGlow, radiusAlpha);
-    this.radiusGraphics.strokeCircle(x, y, magnetRadius);
+    this.radiusGraphics.strokeCircle(x, y, this.magnetRadius);
     this.radiusGraphics.fillStyle(magnetGlow, radiusAlpha * 0.35);
-    this.radiusGraphics.fillCircle(x, y, magnetRadius);
+    this.radiusGraphics.fillCircle(x, y, this.magnetRadius);
   }
 }
