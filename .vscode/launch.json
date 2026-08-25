@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Magnet Rover",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8082",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "vite-dev"
+    }
+  ]
+}
