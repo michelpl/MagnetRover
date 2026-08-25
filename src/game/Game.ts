@@ -2,6 +2,7 @@ import { AUTO, Game, Scale } from 'phaser';
 import { GameConfig } from './config/GameConfig';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
+import { ResultScene } from './scenes/ResultScene';
 
 export function createGame(): Game {
   return new Game({
@@ -14,6 +15,6 @@ export function createGame(): Game {
       mode: Scale.FIT,
       autoCenter: Scale.CENTER_BOTH,
     },
-    scene: [BootScene, GameScene],
+    scene: [BootScene, GameScene, ResultScene],
   });
 }
