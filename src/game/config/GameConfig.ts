@@ -23,6 +23,13 @@ export const GameConfig = {
     processorAccent: 0xffd43b,
     processorPad: 0xe8590c,
   },
+  processor: {
+    /** Dump zone radius in world pixels (circle centered on processor). */
+    areaRadius: 90,
+    bodyWidth: 96,
+    bodyHeight: 80,
+    padRadius: 70,
+  },
   rover: {
     speed: 280,
     inputSmoothing: 0.18,
