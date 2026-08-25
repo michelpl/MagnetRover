@@ -31,6 +31,8 @@ export const GameConfig = {
     moveEpsilon: 8,
     bodyWidth: 56,
     bodyHeight: 72,
+    /** Max cubes in the trailing cargo queue (US-011). */
+    capacity: 20,
     /** Local Y of the rear magnet cue (positive = behind body when front is up). */
     magnetOffsetY: 44,
     magnetGlowRadius: 22,
@@ -54,6 +56,8 @@ export const GameConfig = {
     followSmoothing: 0.28,
     wobbleAmplitude: 1.5,
     wobbleFrequency: 1.2,
+    /** How long the FULL cue stays on screen (ms). */
+    fullCueDurationMs: 1400,
   },
   /** Visual-only cube sizes — magnet, queue, and coins treat every scrap the same. */
   scrap: {
