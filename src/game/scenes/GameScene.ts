@@ -4,6 +4,7 @@ import { GameConfig, isDebugMode } from '../config/GameConfig';
 import type { LevelConfig } from '../config/LevelConfig';
 import { getLevelById } from '../config/Levels';
 import { Processor } from '../entities/Processor';
+import { EnergyPickup } from '../entities/EnergyPickup';
 import { Rover } from '../entities/Rover';
 import { Scrap } from '../entities/Scrap';
 import { CargoSystem } from '../systems/CargoSystem';
@@ -13,10 +14,13 @@ import { MagnetSystem } from '../systems/MagnetSystem';
 import { ProgressSystem } from '../systems/ProgressSystem';
 import { RegionClearSystem } from '../systems/RegionClearSystem';
 import { RunState } from '../systems/RunState';
+import { Save } from '../save/Save';
+import { Upgrades } from '../save/Upgrades';
 import { CargoIndicator } from '../ui/CargoIndicator';
 import { CleanBar } from '../ui/CleanBar';
 import { DebugSpeedButton } from '../ui/DebugSpeedButton';
 import { EnergyBar } from '../ui/EnergyBar';
+import { TutorialOverlay } from '../ui/TutorialOverlay';
 import { VirtualJoystick } from '../ui/VirtualJoystick';
 import type { ResultPayload } from './ResultScene';
 
@@ -28,6 +32,7 @@ export class GameScene extends Scene {
   private rover!: Rover;
   private processor!: Processor;
   private scraps: Scrap[] = [];
+  private energyPickups: EnergyPickup[] = [];
   private cargoSystem!: CargoSystem;
   private magnetSystem!: MagnetSystem;
   private dumpSystem!: DumpSystem;
@@ -38,6 +43,7 @@ export class GameScene extends Scene {
   private energyBar!: EnergyBar;
   private cleanBar!: CleanBar;
   private cargoIndicator!: CargoIndicator;
+  private cargoCapacity: number = GameConfig.rover.capacity;
   private joystick!: VirtualJoystick;
 
   public constructor() {
@@ -46,10 +52,18 @@ export class GameScene extends Scene {
 
   public create(): void {
     Audio.bind(this);
+    const save = Save.load();
+    const applied = Upgrades.getApplied(save.upgrades);
+    this.cargoCapacity = applied.capacity;
+
     const levelId =
-      (this.registry.get('activeLevelId') as number | undefined) ?? DEFAULT_LEVEL_ID;
+      (this.registry.get('activeLevelId') as number | undefined) ??
+      save.currentLevel ??
+      DEFAULT_LEVEL_ID;
     this.registry.set('activeLevelId', levelId);
     this.level = getLevelById(levelId);
+    this.registry.set('mapWidth', this.level.mapWidth);
+    this.registry.set('mapHeight', this.level.mapHeight);
     this.drawEmptyMap(this.level.mapWidth, this.level.mapHeight);
 
     this.rover = new Rover(
@@ -57,11 +71,13 @@ export class GameScene extends Scene {
       this.level.mapWidth / 2,
       this.level.mapHeight / 2,
     );
+    this.rover.setMoveSpeed(applied.speed);
 
     this.scraps = this.spawnLevelEntities(this.level);
-    this.cargoSystem = new CargoSystem(this.rover, this.scraps);
+    this.cargoSystem = new CargoSystem(this.rover, this.scraps, applied.capacity);
     this.cargoSystem.setProcessor(this.processor);
     this.magnetSystem = new MagnetSystem(this.rover, this.scraps, this.cargoSystem);
+    this.magnetSystem.setMagnetRadius(applied.magnetRadius);
     this.magnetSystem.setCanAttract(() => this.cargoSystem.canAccept());
     this.dumpSystem = new DumpSystem(
       this.rover,
@@ -97,6 +113,8 @@ export class GameScene extends Scene {
         this.rover.setSpeedBoostActive(active);
       });
     }
+
+    new TutorialOverlay(this).tryShow();
   }
 
   public update(_time: number, delta: number): void {
@@ -111,13 +129,11 @@ export class GameScene extends Scene {
     this.cargoSystem.update(delta);
     this.dumpSystem.update(delta);
     this.energySystem.update(delta, this.rover.isMoving);
+    this.collectEnergyPickups();
 
     this.energyBar.setRatio(this.energySystem.ratio);
     this.cleanBar.setRatio(this.progressSystem.cleanupRatio);
-    this.cargoIndicator.setCargo(
-      this.cargoSystem.length,
-      GameConfig.rover.capacity,
-    );
+    this.cargoIndicator.setCargo(this.cargoSystem.length, this.cargoCapacity);
 
     this.evaluateRunEnd();
   }
@@ -154,6 +170,20 @@ export class GameScene extends Scene {
     this.scene.start('ResultScene');
   }
 
+  private collectEnergyPickups(): void {
+    const bonus = this.energySystem.maxEnergy * GameConfig.energy.pickupBonusRatio;
+    for (const pickup of this.energyPickups) {
+      if (pickup.collected) {
+        continue;
+      }
+      if (pickup.overlapsRover(this.rover.x, this.rover.y)) {
+        pickup.collected = true;
+        this.energySystem.addEnergy(bonus);
+        pickup.destroy();
+      }
+    }
+  }
+
   /** Wire entities from LevelConfig — no attraction or dump math here. */
   private spawnLevelEntities(level: LevelConfig): Scrap[] {
     this.processor = new Processor(this, level.processor.x, level.processor.y);
@@ -163,6 +193,13 @@ export class GameScene extends Scene {
       scraps.push(
         new Scrap(this, scrap.x, scrap.y, scrap.color, scrap.size, scrap.regionId ?? 0),
       );
+    }
+
+    this.energyPickups = [];
+    for (const powerUp of level.powerUps ?? []) {
+      if (powerUp.type === 'energy') {
+        this.energyPickups.push(new EnergyPickup(this, powerUp.x, powerUp.y));
+      }
     }
     return scraps;
   }

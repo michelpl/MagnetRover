@@ -23,6 +23,7 @@ export class Rover extends GameObjects.Container {
   /** Extra axes from virtual joystick (US-006); merged with keyboard each frame. */
   private joystickInputX = 0;
   private joystickInputY = 0;
+  private moveSpeed: number = GameConfig.rover.speed;
 
   public constructor(scene: Scene, x: number, y: number) {
     super(scene, x, y);
@@ -91,11 +92,15 @@ export class Rover extends GameObjects.Container {
     this.joystickInputY = y;
   }
 
+  public setMoveSpeed(speed: number): void {
+    this.moveSpeed = speed;
+  }
+
   public updateRover(delta: number): void {
     const input = this.readMoveInput();
     const speed = this.speedBoostActive
       ? GameConfig.debug.boostSpeed
-      : GameConfig.rover.speed;
+      : this.moveSpeed;
 
     this.velocityX = this.damp(
       this.velocityX,
@@ -197,8 +202,12 @@ export class Rover extends GameObjects.Container {
 
   private clampToMap(): void {
     const radius = Math.max(GameConfig.rover.bodyWidth, GameConfig.rover.bodyHeight) / 2;
-    this.x = PhaserMath.Clamp(this.x, radius, GameConfig.map.width - radius);
-    this.y = PhaserMath.Clamp(this.y, radius, GameConfig.map.height - radius);
+    const mapWidth = this.scene.registry.get('mapWidth') as number | undefined;
+    const mapHeight = this.scene.registry.get('mapHeight') as number | undefined;
+    const width = mapWidth ?? GameConfig.map.width;
+    const height = mapHeight ?? GameConfig.map.height;
+    this.x = PhaserMath.Clamp(this.x, radius, width - radius);
+    this.y = PhaserMath.Clamp(this.y, radius, height - radius);
   }
 
   private damp(current: number, target: number, smoothing: number, delta: number): number {

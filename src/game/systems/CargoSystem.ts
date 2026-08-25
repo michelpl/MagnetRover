@@ -14,7 +14,7 @@ export type WorldPoint = { x: number; y: number };
  */
 export class CargoSystem {
   public readonly cargo: Scrap[] = [];
-  private capacity = GameConfig.rover.capacity;
+  private capacity: number = GameConfig.rover.capacity;
   private fullCue: GameObjects.Text | null = null;
   private wasFull = false;
   private attachStaggerMs = 0;
@@ -23,7 +23,14 @@ export class CargoSystem {
   public constructor(
     private readonly rover: Rover,
     private readonly scraps: Scrap[],
-  ) {}
+    capacity: number = GameConfig.rover.capacity,
+  ) {
+    this.capacity = capacity;
+  }
+
+  public setCapacity(capacity: number): void {
+    this.capacity = capacity;
+  }
 
   public setProcessor(processor: Processor): void {
     this.processor = processor;
