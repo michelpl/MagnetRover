@@ -53,7 +53,8 @@ function buildPrototypeScraps(
   const scraps: LevelScrap[] = [];
   const clearR2 = PROCESSOR_CLEAR_RADIUS * PROCESSOR_CLEAR_RADIUS;
 
-  for (const cluster of PROTOTYPE_CLUSTERS) {
+  for (let regionId = 0; regionId < PROTOTYPE_CLUSTERS.length; regionId += 1) {
+    const cluster = PROTOTYPE_CLUSTERS[regionId];
     let placed = 0;
     let attempts = 0;
     const maxAttempts = cluster.count * 40;
@@ -83,6 +84,7 @@ function buildPrototypeScraps(
         y: Math.round(y),
         color: SCRAP_COLORS[Math.floor(rand() * SCRAP_COLORS.length)] ?? SCRAP_COLORS[0],
         size: SCRAP_SIZES[Math.floor(rand() * SCRAP_SIZES.length)] ?? 'medium',
+        regionId,
       });
       placed += 1;
     }

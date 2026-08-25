@@ -22,6 +22,8 @@ export class Scrap extends GameObjects.Container {
   public state: ScrapState = 'Idle';
   public readonly color: string;
   public readonly size: ScrapSize;
+  public readonly regionId: number;
+  private glow: GameObjects.Arc | null = null;
 
   public constructor(
     scene: Scene,
@@ -29,12 +31,25 @@ export class Scrap extends GameObjects.Container {
     y: number,
     color: string,
     size: ScrapSize,
+    regionId = 0,
   ) {
     super(scene, x, y);
     this.color = color;
     this.size = size;
+    this.regionId = regionId;
     this.drawCube();
     scene.add.existing(this);
+  }
+
+  public setAttractGlow(active: boolean): void {
+    if (active && !this.glow) {
+      const side = GameConfig.scrap.sizePx[this.size];
+      this.glow = this.scene.add.circle(0, 0, side * 0.85, GameConfig.colors.magnetGlow, 0.28);
+      this.addAt(this.glow, 0);
+    } else if (!active && this.glow) {
+      this.glow.destroy();
+      this.glow = null;
+    }
   }
 
   private drawCube(): void {

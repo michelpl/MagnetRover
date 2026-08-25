@@ -56,7 +56,10 @@ export const GameConfig = {
     magnetRadius: 140,
     /** Per ~16.67ms frame factor; applied with delta scaling in MagnetSystem. */
     attractionSpeed: 0.14,
+    /** Extra pull factor while Attracted (US-022). */
+    attractionBoost: 1.55,
     radiusAlpha: 0.18,
+    spinDegPerSec: 220,
   },
   /** Malleable trailing queue (snake/train) behind the rear magnet. */
   cargo: {

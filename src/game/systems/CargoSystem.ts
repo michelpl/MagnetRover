@@ -1,5 +1,8 @@
 import { GameObjects } from 'phaser';
+import { Audio } from '../audio/Audio';
+import { Haptics } from '../audio/Haptics';
 import { GameConfig } from '../config/GameConfig';
+import type { Processor } from '../entities/Processor';
 import type { Rover } from '../entities/Rover';
 import type { Scrap } from '../entities/Scrap';
 
@@ -14,11 +17,17 @@ export class CargoSystem {
   private capacity = GameConfig.rover.capacity;
   private fullCue: GameObjects.Text | null = null;
   private wasFull = false;
+  private attachStaggerMs = 0;
+  private processor: Processor | null = null;
 
   public constructor(
     private readonly rover: Rover,
     private readonly scraps: Scrap[],
   ) {}
+
+  public setProcessor(processor: Processor): void {
+    this.processor = processor;
+  }
 
   public get length(): number {
     return this.cargo.length;
@@ -46,7 +55,9 @@ export class CargoSystem {
       return false;
     }
     scrap.state = 'Carried';
+    scrap.setAttractGlow(false);
     this.cargo.push(scrap);
+    this.playAttachFeedback(scrap);
     return true;
   }
 
@@ -66,6 +77,9 @@ export class CargoSystem {
    * then each carried cube lerps toward the previous segment.
    */
   public update(delta: number): void {
+    if (this.attachStaggerMs > 0) {
+      this.attachStaggerMs -= delta;
+    }
     const magnet = this.rover.getMagnetWorldPosition();
     this.tryAttachAttracted(magnet);
     this.releaseOverflowAttracted();
@@ -73,8 +87,21 @@ export class CargoSystem {
     this.updateFullCue();
   }
 
+  private playAttachFeedback(scrap: Scrap): void {
+    Audio.play('stick', 0.4);
+    Haptics.vibrate(10);
+    this.rover.scene.tweens.add({
+      targets: scrap,
+      scaleX: 1.25,
+      scaleY: 1.25,
+      duration: 70,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+    });
+  }
+
   private tryAttachAttracted(magnet: WorldPoint): void {
-    if (!this.canAccept()) {
+    if (!this.canAccept() || this.attachStaggerMs > 0) {
       return;
     }
     const tip = this.getQueueTip(magnet);
@@ -90,7 +117,10 @@ export class CargoSystem {
       const dx = scrap.x - tip.x;
       const dy = scrap.y - tip.y;
       if (dx * dx + dy * dy <= stickSq) {
-        this.attach(scrap);
+        if (this.attach(scrap)) {
+          this.attachStaggerMs = 28;
+          break;
+        }
       }
     }
   }
@@ -103,6 +133,7 @@ export class CargoSystem {
     for (const scrap of this.scraps) {
       if (scrap.state === 'Attracted') {
         scrap.state = 'Idle';
+        scrap.setAttractGlow(false);
       }
     }
   }
@@ -111,10 +142,24 @@ export class CargoSystem {
     const full = this.isFull;
     if (full && !this.wasFull) {
       this.showFullCue();
+      Audio.play('full', 0.5);
+      Haptics.vibrate(18);
+      this.rover.scene.tweens.add({
+        targets: this.rover,
+        scaleX: 1.12,
+        scaleY: 1.12,
+        duration: 90,
+        yoyo: true,
+        repeat: 1,
+      });
+      this.processor?.setHintPulse(true);
     }
-    if (!full && this.fullCue) {
-      this.fullCue.destroy();
-      this.fullCue = null;
+    if (!full) {
+      this.processor?.setHintPulse(false);
+      if (this.fullCue) {
+        this.fullCue.destroy();
+        this.fullCue = null;
+      }
     }
     this.wasFull = full;
 
@@ -170,7 +215,6 @@ export class CargoSystem {
       let dy = scrap.y - prevY;
       let dist = Math.hypot(dx, dy);
 
-      // Just stuck: place behind previous along rover rear (local +Y).
       if (dist < 0.001) {
         const facing = this.rover.rotation;
         dx = -Math.sin(facing);
