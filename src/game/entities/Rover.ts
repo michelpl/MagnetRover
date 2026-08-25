@@ -8,11 +8,21 @@ type ArrowKeys = {
   right: Input.Keyboard.Key;
 };
 
+/** Unit-ish move vector; callers may pass raw joystick axes (merged then normalized). */
+export type MoveInput = {
+  x: number;
+  y: number;
+};
+
 export class Rover extends GameObjects.Container {
   private readonly wasd: ArrowKeys;
   private readonly arrows: ArrowKeys;
   private velocityX = 0;
   private velocityY = 0;
+  private speedBoostActive = false;
+  /** Extra axes from virtual joystick (US-006); merged with keyboard each frame. */
+  private joystickInputX = 0;
+  private joystickInputY = 0;
 
   public constructor(scene: Scene, x: number, y: number) {
     super(scene, x, y);
@@ -52,28 +62,50 @@ export class Rover extends GameObjects.Container {
     scene.add.existing(this);
   }
 
+  /**
+   * True while velocity is above moveEpsilon — used later for energy drain while moving.
+   */
+  public get isMoving(): boolean {
+    const { moveEpsilon } = GameConfig.rover;
+    return Math.abs(this.velocityX) > moveEpsilon || Math.abs(this.velocityY) > moveEpsilon;
+  }
+
+  /** World position of the rear magnet anchor (local +Y rotated into world). */
+  public getMagnetWorldPosition(): { x: number; y: number } {
+    const { magnetOffsetY } = GameConfig.rover;
+    const cos = Math.cos(this.rotation);
+    const sin = Math.sin(this.rotation);
+    // Local (0, magnetOffsetY) under Phaser rotation: (-y·sin, y·cos).
+    return {
+      x: this.x - sin * magnetOffsetY,
+      y: this.y + cos * magnetOffsetY,
+    };
+  }
+
+  /**
+   * Inject joystick axes (typically -1..1). Merged with keyboard, then normalized once.
+   * Pass zeros when the stick is idle so keyboard-only play keeps working.
+   */
+  public setJoystickInput(x: number, y: number): void {
+    this.joystickInputX = x;
+    this.joystickInputY = y;
+  }
+
   public updateRover(delta: number): void {
-    const inputX = Number(this.isHeld('right')) - Number(this.isHeld('left'));
-    const inputY = Number(this.isHeld('down')) - Number(this.isHeld('up'));
+    const input = this.readMoveInput();
+    const speed = this.speedBoostActive
+      ? GameConfig.debug.boostSpeed
+      : GameConfig.rover.speed;
 
-    let targetX = inputX;
-    let targetY = inputY;
-    if (targetX !== 0 || targetY !== 0) {
-      const length = Math.hypot(targetX, targetY);
-      targetX /= length;
-      targetY /= length;
-    }
-
-    const speed = GameConfig.rover.speed;
     this.velocityX = this.damp(
       this.velocityX,
-      targetX * speed,
+      input.x * speed,
       GameConfig.rover.inputSmoothing,
       delta,
     );
     this.velocityY = this.damp(
       this.velocityY,
-      targetY * speed,
+      input.y * speed,
       GameConfig.rover.inputSmoothing,
       delta,
     );
@@ -83,8 +115,7 @@ export class Rover extends GameObjects.Container {
     this.y += this.velocityY * dt;
     this.clampToMap();
 
-    const moving = Math.abs(this.velocityX) > 8 || Math.abs(this.velocityY) > 8;
-    if (moving) {
+    if (this.isMoving) {
       const targetRotation = Math.atan2(this.velocityX, -this.velocityY);
       this.rotation = PhaserMath.Angle.RotateTo(
         this.rotation,
@@ -94,10 +125,58 @@ export class Rover extends GameObjects.Container {
     }
   }
 
+  /** Debug-only: when true, uses `GameConfig.debug.boostSpeed` instead of normal speed. */
+  public setSpeedBoostActive(active: boolean): void {
+    this.speedBoostActive = active;
+  }
+
+  /**
+   * Merge keyboard + joystick into one vector, then normalize so diagonals are not faster.
+   * Shared damp/rotate path — do not branch smoothing by input source.
+   */
+  private readMoveInput(): MoveInput {
+    const keyboardX = Number(this.isHeld('right')) - Number(this.isHeld('left'));
+    const keyboardY = Number(this.isHeld('down')) - Number(this.isHeld('up'));
+
+    let x = keyboardX + this.joystickInputX;
+    let y = keyboardY + this.joystickInputY;
+
+    if (x !== 0 || y !== 0) {
+      const length = Math.hypot(x, y);
+      x /= length;
+      y /= length;
+    }
+
+    return { x, y };
+  }
+
   private drawBody(): void {
+    const graphics = this.scene.add.graphics();
+    this.drawMagnetCue(graphics);
+    this.drawHull(graphics);
+    this.add(graphics);
+  }
+
+  /** Soft rear glow + ring only — full magnetRadius preview belongs to MagnetSystem (US-009). */
+  private drawMagnetCue(graphics: GameObjects.Graphics): void {
+    const { magnetOffsetY, magnetGlowRadius, magnetRingRadius, magnetRingWidth } =
+      GameConfig.rover;
+    const { magnetGlow } = GameConfig.colors;
+
+    graphics.fillStyle(magnetGlow, 0.12);
+    graphics.fillCircle(0, magnetOffsetY, magnetGlowRadius);
+    graphics.fillStyle(magnetGlow, 0.28);
+    graphics.fillCircle(0, magnetOffsetY, magnetGlowRadius * 0.65);
+    graphics.fillStyle(magnetGlow, 0.55);
+    graphics.fillCircle(0, magnetOffsetY, magnetGlowRadius * 0.35);
+
+    graphics.lineStyle(magnetRingWidth, magnetGlow, 0.9);
+    graphics.strokeCircle(0, magnetOffsetY, magnetRingRadius);
+  }
+
+  private drawHull(graphics: GameObjects.Graphics): void {
     const { bodyWidth, bodyHeight } = GameConfig.rover;
     const { roverBody, roverCabin, roverAccent } = GameConfig.colors;
-    const graphics = this.scene.add.graphics();
 
     graphics.fillStyle(roverBody, 1);
     graphics.fillRoundedRect(-bodyWidth / 2, -bodyHeight / 2, bodyWidth, bodyHeight, 10);
@@ -114,8 +193,6 @@ export class Rover extends GameObjects.Container {
       10,
       -bodyHeight / 2 + 6,
     );
-
-    this.add(graphics);
   }
 
   private clampToMap(): void {
