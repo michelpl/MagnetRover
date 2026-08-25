@@ -19,7 +19,7 @@ import { VirtualJoystick } from '../ui/VirtualJoystick';
 import type { ResultPayload } from './ResultScene';
 
 /** Prototype level until menu / level select exists. */
-const ACTIVE_LEVEL_ID = 1;
+const DEFAULT_LEVEL_ID = 1;
 
 export class GameScene extends Scene {
   private level!: LevelConfig;
@@ -42,7 +42,10 @@ export class GameScene extends Scene {
   }
 
   public create(): void {
-    this.level = getLevelById(ACTIVE_LEVEL_ID);
+    const levelId =
+      (this.registry.get('activeLevelId') as number | undefined) ?? DEFAULT_LEVEL_ID;
+    this.registry.set('activeLevelId', levelId);
+    this.level = getLevelById(levelId);
     this.drawEmptyMap(this.level.mapWidth, this.level.mapHeight);
 
     this.rover = new Rover(
