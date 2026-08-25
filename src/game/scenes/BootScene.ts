@@ -6,6 +6,6 @@ export class BootScene extends Scene {
   }
 
   public create(): void {
-    this.scene.start('GameScene');
+    this.scene.start('MenuScene');
   }
 }
