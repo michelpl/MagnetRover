@@ -38,6 +38,7 @@ export class GameScene extends Scene {
     this.scraps = this.spawnLevelEntities(this.level);
     this.cargoSystem = new CargoSystem(this.rover, this.scraps);
     this.magnetSystem = new MagnetSystem(this.rover, this.scraps, this.cargoSystem);
+    this.magnetSystem.setCanAttract(() => this.cargoSystem.canAccept());
 
     this.joystick = new VirtualJoystick(this);
 

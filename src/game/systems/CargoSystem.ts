@@ -1,3 +1,4 @@
+import { GameObjects } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
 import type { Rover } from '../entities/Rover';
 import type { Scrap } from '../entities/Scrap';
@@ -10,6 +11,9 @@ export type WorldPoint = { x: number; y: number };
  */
 export class CargoSystem {
   public readonly cargo: Scrap[] = [];
+  private capacity = GameConfig.rover.capacity;
+  private fullCue: GameObjects.Text | null = null;
+  private wasFull = false;
 
   public constructor(
     private readonly rover: Rover,
@@ -18,6 +22,14 @@ export class CargoSystem {
 
   public get length(): number {
     return this.cargo.length;
+  }
+
+  public get isFull(): boolean {
+    return this.cargo.length >= this.capacity;
+  }
+
+  public canAccept(): boolean {
+    return this.cargo.length < this.capacity;
   }
 
   /** Tip of the queue: magnet when empty, otherwise the last carried cube. */
@@ -29,12 +41,13 @@ export class CargoSystem {
     return { x: last.x, y: last.y };
   }
 
-  public attach(scrap: Scrap): void {
-    if (scrap.state === 'Carried') {
-      return;
+  public attach(scrap: Scrap): boolean {
+    if (scrap.state === 'Carried' || !this.canAccept()) {
+      return false;
     }
     scrap.state = 'Carried';
     this.cargo.push(scrap);
+    return true;
   }
 
   public detachAll(): Scrap[] {
@@ -50,14 +63,22 @@ export class CargoSystem {
   public update(delta: number): void {
     const magnet = this.rover.getMagnetWorldPosition();
     this.tryAttachAttracted(magnet);
+    this.releaseOverflowAttracted();
     this.updateQueueFollow(magnet, delta);
+    this.updateFullCue();
   }
 
   private tryAttachAttracted(magnet: WorldPoint): void {
+    if (!this.canAccept()) {
+      return;
+    }
     const tip = this.getQueueTip(magnet);
     const stickSq = GameConfig.cargo.stickRadius * GameConfig.cargo.stickRadius;
 
     for (const scrap of this.scraps) {
+      if (!this.canAccept()) {
+        break;
+      }
       if (scrap.state !== 'Attracted') {
         continue;
       }
@@ -67,6 +88,66 @@ export class CargoSystem {
         this.attach(scrap);
       }
     }
+  }
+
+  /** When cargo is full, Attracted scraps that cannot join drop back to Idle. */
+  private releaseOverflowAttracted(): void {
+    if (!this.isFull) {
+      return;
+    }
+    for (const scrap of this.scraps) {
+      if (scrap.state === 'Attracted') {
+        scrap.state = 'Idle';
+      }
+    }
+  }
+
+  private updateFullCue(): void {
+    const full = this.isFull;
+    if (full && !this.wasFull) {
+      this.showFullCue();
+    }
+    if (!full && this.fullCue) {
+      this.fullCue.destroy();
+      this.fullCue = null;
+    }
+    this.wasFull = full;
+
+    if (this.fullCue) {
+      this.fullCue.setPosition(this.rover.x, this.rover.y - 70);
+    }
+  }
+
+  private showFullCue(): void {
+    if (this.fullCue) {
+      this.fullCue.destroy();
+    }
+    const text = this.rover.scene.add
+      .text(this.rover.x, this.rover.y - 70, 'FULL — dump at processor', {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '28px',
+        color: '#ffd43b',
+        stroke: '#000000',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(1000);
+
+    this.fullCue = text;
+    this.rover.scene.tweens.add({
+      targets: text,
+      alpha: { from: 1, to: 0.35 },
+      duration: 280,
+      yoyo: true,
+      repeat: 2,
+    });
+
+    this.rover.scene.time.delayedCall(GameConfig.cargo.fullCueDurationMs, () => {
+      if (this.fullCue === text) {
+        text.destroy();
+        this.fullCue = null;
+      }
+    });
   }
 
   private updateQueueFollow(magnet: WorldPoint, delta: number): void {
