@@ -4,16 +4,16 @@ overview: "Add ProgressSystem tracking totalObjects, remainingObjects, carriedOb
 todos:
   - id: progress-system
     content: "Create ProgressSystem"
-    status: pending
+    status: completed
   - id: track-counts
     content: "Track totalObjects, remainingObjects, carriedObjects"
-    status: pending
+    status: completed
   - id: remaining-excludes-processed
     content: "remainingObjects excludes processed scraps"
-    status: pending
+    status: completed
   - id: drive-clean-bar
     content: "Drive the cleanup bar from this value"
-    status: pending
+    status: completed
 isProject: true
 ---
 
@@ -25,7 +25,7 @@ Add ProgressSystem tracking totalObjects, remainingObjects, carriedObjects and d
 
 - **Roadmap ID:** US-016
 - **Epic:** Epic 2 — Game loop
-- **Status:** Not started.
+- **Status:** Done.
 - **Done when:** cleanPercentage = ((totalObjects - remainingObjects) / totalObjects) * 100.
 - **Source of truth:** [MVP.md](../../MVP.md), [ROADMAP.md](../../ROADMAP.md)
 - **Rules:** `.cursor/rules/` (premises, architecture, TypeScript, Phaser, English)
