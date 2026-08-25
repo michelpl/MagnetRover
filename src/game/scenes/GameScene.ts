@@ -9,7 +9,11 @@ import { CargoSystem } from '../systems/CargoSystem';
 import { DumpSystem } from '../systems/DumpSystem';
 import { EnergySystem } from '../systems/EnergySystem';
 import { MagnetSystem } from '../systems/MagnetSystem';
+import { ProgressSystem } from '../systems/ProgressSystem';
+import { CargoIndicator } from '../ui/CargoIndicator';
+import { CleanBar } from '../ui/CleanBar';
 import { DebugSpeedButton } from '../ui/DebugSpeedButton';
+import { EnergyBar } from '../ui/EnergyBar';
 import { VirtualJoystick } from '../ui/VirtualJoystick';
 
 /** Prototype level until menu / level select exists. */
@@ -24,6 +28,10 @@ export class GameScene extends Scene {
   private magnetSystem!: MagnetSystem;
   private dumpSystem!: DumpSystem;
   private energySystem!: EnergySystem;
+  private progressSystem!: ProgressSystem;
+  private energyBar!: EnergyBar;
+  private cleanBar!: CleanBar;
+  private cargoIndicator!: CargoIndicator;
   private joystick!: VirtualJoystick;
 
   public constructor() {
@@ -51,6 +59,16 @@ export class GameScene extends Scene {
       this.scraps,
     );
     this.energySystem = new EnergySystem(this.level.initialEnergy);
+    this.progressSystem = new ProgressSystem(
+      this.scraps,
+      this.cargoSystem,
+      this.dumpSystem,
+      this.scraps.length,
+    );
+
+    this.energyBar = new EnergyBar(this);
+    this.cleanBar = new CleanBar(this);
+    this.cargoIndicator = new CargoIndicator(this);
 
     this.joystick = new VirtualJoystick(this);
 
@@ -73,6 +91,13 @@ export class GameScene extends Scene {
     this.cargoSystem.update(delta);
     this.dumpSystem.update(delta);
     this.energySystem.update(delta, this.rover.isMoving);
+
+    this.energyBar.setRatio(this.energySystem.ratio);
+    this.cleanBar.setRatio(this.progressSystem.cleanupRatio);
+    this.cargoIndicator.setCargo(
+      this.cargoSystem.length,
+      GameConfig.rover.capacity,
+    );
   }
 
   /** Wire entities from LevelConfig — no attraction or dump math here. */
