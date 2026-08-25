@@ -21,6 +21,11 @@ export class EnergySystem {
     return this.energy <= 0;
   }
 
+  /** Restore energy from a pickup; clamped to max. */
+  public addEnergy(amount: number): void {
+    this.energy = Math.min(this.maxEnergy, this.energy + amount);
+  }
+
   public update(delta: number, isMoving: boolean): void {
     if (!isMoving || this.energy <= 0) {
       return;
