@@ -8,11 +8,11 @@ export class EnergyPickup extends GameObjects.Container {
     super(scene, x, y);
     const graphics = scene.add.graphics();
     graphics.fillStyle(0x69db7c, 1);
-    graphics.fillRoundedRect(-18, -28, 36, 56, 6);
+    graphics.fillRoundedRect(-11, -17, 22, 34, 4);
     graphics.fillStyle(0x212529, 1);
-    graphics.fillRect(-10, -34, 20, 8);
+    graphics.fillRect(-6, -21, 12, 5);
     graphics.lineStyle(2, 0xffffff, 0.45);
-    graphics.strokeRoundedRect(-18, -28, 36, 56, 6);
+    graphics.strokeRoundedRect(-11, -17, 22, 34, 4);
     this.add(graphics);
     scene.add.existing(this);
   }
@@ -20,6 +20,6 @@ export class EnergyPickup extends GameObjects.Container {
   public overlapsRover(x: number, y: number): boolean {
     const dx = this.x - x;
     const dy = this.y - y;
-    return dx * dx + dy * dy <= 55 * 55;
+    return dx * dx + dy * dy <= 34 * 34;
   }
 }

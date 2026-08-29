@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Magnet Rover — gear scrap options</title>
+    <style>
+      :root {
+        --bg: #0b0d12;
+        --panel: #16181f;
+        --ink: #e9ecef;
+        --muted: #868e96;
+        --zoom: 3.4;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+
+      header {
+        padding: 28px 32px 8px;
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 22px;
+        font-weight: 650;
+      }
+
+      p.lead {
+        margin: 0;
+        color: var(--muted);
+        max-width: 72ch;
+        line-height: 1.5;
+      }
+
+      .grid {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 20px 32px 64px;
+        display: grid;
+        gap: 20px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid #2c2f38;
+        border-radius: 14px;
+        overflow: hidden;
+      }
+
+      .card h2 {
+        margin: 0;
+        padding: 16px 18px 4px;
+        font-size: 16px;
+      }
+
+      .card .desc {
+        padding: 0 18px 12px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .stage {
+        position: relative;
+        height: 240px;
+        background:
+          url("../public/assets/ui/scenario1.png") center / cover no-repeat,
+          #1a1c22;
+      }
+
+      .stage::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: rgba(8, 10, 14, 0.18);
+      }
+
+      .zoom {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 28px;
+        transform: scale(var(--zoom));
+        z-index: 1;
+      }
+
+      .label {
+        position: absolute;
+        left: 12px;
+        bottom: 10px;
+        z-index: 2;
+        font-size: 11px;
+        color: #ced4da;
+        background: rgba(0, 0, 0, 0.45);
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+
+      .s svg {
+        width: 14px;
+        height: 14px;
+      }
+      .m svg {
+        width: 18px;
+        height: 18px;
+      }
+      .l svg {
+        width: 24px;
+        height: 24px;
+      }
+
+      svg {
+        display: block;
+        overflow: visible;
+      }
+
+      footer {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 0 32px 40px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Scrap as gears</h1>
+      <p class="lead">
+        SVG only, no new bitmaps. Preview scaled like the in-run camera (~3.4×).
+        Same palette and sizes as current scraps (<code>14 / 18 / 24</code>).
+      </p>
+    </header>
+    <div class="grid" id="grid"></div>
+    <footer>Open this file in a browser. Floor: <code>public/assets/ui/scenario1.png</code>.</footer>
+
+    <script>
+      const COLORS = [
+        "#adb5bd",
+        "#ffd43b",
+        "#ff922b",
+        "#74c0fc",
+        "#69db7c",
+        "#e599f7",
+        "#ffa8a8",
+        "#ced4da",
+      ];
+
+      function shade(hex, amt) {
+        const n = hex.replace("#", "");
+        const r = Math.max(0, Math.min(255, parseInt(n.slice(0, 2), 16) + amt));
+        const g = Math.max(0, Math.min(255, parseInt(n.slice(2, 4), 16) + amt));
+        const b = Math.max(0, Math.min(255, parseInt(n.slice(4, 6), 16) + amt));
+        return `rgb(${r},${g},${b})`;
+      }
+
+      function squaredGear(cx, cy, teeth, innerR, outerR, toothFrac) {
+        const pts = [];
+        const step = (Math.PI * 2) / teeth;
+        const half = (step * toothFrac) / 2;
+        for (let i = 0; i < teeth; i++) {
+          const mid = i * step - Math.PI / 2;
+          const gap = mid + step / 2;
+          pts.push(
+            [cx + Math.cos(mid - half) * innerR, cy + Math.sin(mid - half) * innerR],
+            [cx + Math.cos(mid - half) * outerR, cy + Math.sin(mid - half) * outerR],
+            [cx + Math.cos(mid + half) * outerR, cy + Math.sin(mid + half) * outerR],
+            [cx + Math.cos(mid + half) * innerR, cy + Math.sin(mid + half) * innerR],
+            [cx + Math.cos(gap) * innerR, cy + Math.sin(gap) * innerR],
+          );
+        }
+        let d = `M ${pts[0][0].toFixed(2)} ${pts[0][1].toFixed(2)}`;
+        for (let i = 1; i < pts.length; i++) {
+          d += ` L ${pts[i][0].toFixed(2)} ${pts[i][1].toFixed(2)}`;
+        }
+        return d + " Z";
+      }
+
+      const OPTIONS = [
+        {
+          id: "A",
+          title: "A — Solid 8-tooth",
+          desc: "Simple painted gear, big hub hole. Reads clearly at 14px.",
+          draw: (c) => gearA(c, 8, false),
+        },
+        {
+          id: "B",
+          title: "B — Beveled metal",
+          desc: "Two stacked gears (highlight + shadow) for a machined rim.",
+          draw: (c) => gearBevel(c),
+        },
+        {
+          id: "C",
+          title: "C — Brass + spokes",
+          desc: "Four spokes, darker rim. More “workshop scrap”.",
+          draw: (c) => gearSpokes(c),
+        },
+        {
+          id: "D",
+          title: "D — Hazard teeth",
+          desc: "Yellow/black tooth tips, colored body. Matches floor stripes.",
+          draw: (c) => gearHazard(c),
+        },
+        {
+          id: "E",
+          title: "E — Nested double gear",
+          desc: "Small inner gear offset in hue. Looks like a mechanism, not a coin.",
+          draw: (c) => gearNested(c),
+        },
+        {
+          id: "F",
+          title: "F — Hex-bore industrial",
+          desc: "Hex nut in the center like a bolt head. Processor hardware vibe.",
+          draw: (c) => gearHex(c),
+        },
+        {
+          id: "G",
+          title: "G — Thin rim / many teeth",
+          desc: "12 fine teeth, thin ring. More technical, less toy.",
+          draw: (c) => gearFine(c),
+        },
+        {
+          id: "H",
+          title: "H — Rusty chunk",
+          desc: "Irregular 7-tooth, darker pits, worn hole. Looks dumped on the floor.",
+          draw: (c) => gearWorn(c),
+        },
+      ];
+
+      function svgWrap(inner) {
+        return `<svg viewBox="0 0 24 24">${inner}</svg>`;
+      }
+
+      function gearA(c) {
+        const d = squaredGear(12, 12, 8, 7.2, 11.2, 0.32);
+        return svgWrap(`
+          <path d="${d}" fill="${c}" stroke="${shade(c, -50)}" stroke-width="0.6"/>
+          <circle cx="12" cy="12" r="3.1" fill="#1a1c22" stroke="${shade(c, 40)}" stroke-width="1.2"/>
+        `);
+      }
+
+      function gearBevel(c) {
+        const d = squaredGear(12, 12, 8, 7.1, 11.1, 0.3);
+        return svgWrap(`
+          <path d="${d}" fill="${shade(c, -70)}" transform="translate(0.6 0.7)"/>
+          <path d="${d}" fill="${c}"/>
+          <path d="${d}" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="0.7"/>
+          <circle cx="12" cy="12" r="4.4" fill="${shade(c, -30)}"/>
+          <circle cx="12" cy="12" r="2.4" fill="#12141a"/>
+          <circle cx="10.6" cy="10.4" r="1.1" fill="rgba(255,255,255,0.28)"/>
+        `);
+      }
+
+      function gearSpokes(c) {
+        const d = squaredGear(12, 12, 10, 7.4, 11.3, 0.28);
+        return svgWrap(`
+          <path d="${d}" fill="${shade(c, -40)}"/>
+          <path d="${d}" fill="${c}" transform="scale(0.92) translate(1.05 1.05)"/>
+          <rect x="11.1" y="5.2" width="1.8" height="13.6" rx="0.4" fill="${shade(c, 20)}"/>
+          <rect x="5.2" y="11.1" width="13.6" height="1.8" rx="0.4" fill="${shade(c, 20)}"/>
+          <circle cx="12" cy="12" r="3.4" fill="${shade(c, -20)}"/>
+          <circle cx="12" cy="12" r="1.8" fill="#16181f"/>
+        `);
+      }
+
+      function gearHazard(c) {
+        const d = squaredGear(12, 12, 8, 7, 11.2, 0.34);
+        const tips = squaredGear(12, 12, 8, 9.2, 11.2, 0.34);
+        return svgWrap(`
+          <path d="${d}" fill="${c}"/>
+          <path d="${tips}" fill="#111"/>
+          <path d="${tips}" fill="#ffd43b" opacity="0.85" clip-path="url(#h)"/>
+          <circle cx="12" cy="12" r="5.6" fill="${c}"/>
+          <circle cx="12" cy="12" r="2.6" fill="#111"/>
+          <circle cx="12" cy="12" r="1.5" fill="${c}"/>
+        `);
+      }
+
+      function gearNested(c) {
+        const outer = squaredGear(12, 12, 9, 7.6, 11.4, 0.3);
+        const inner = squaredGear(12, 12, 6, 4.2, 6.4, 0.34);
+        return svgWrap(`
+          <path d="${outer}" fill="${c}" stroke="${shade(c, -60)}" stroke-width="0.5"/>
+          <circle cx="12" cy="12" r="6.6" fill="${shade(c, -25)}"/>
+          <path d="${inner}" fill="${shade(c, 45)}"/>
+          <circle cx="12" cy="12" r="2" fill="#14161c"/>
+        `);
+      }
+
+      function gearHex(c) {
+        const d = squaredGear(12, 12, 8, 7.3, 11.2, 0.3);
+        return svgWrap(`
+          <path d="${d}" fill="${c}" stroke="#1a1c22" stroke-width="0.7"/>
+          <circle cx="12" cy="12" r="5.2" fill="${shade(c, -35)}"/>
+          <polygon points="12,7.4 16.1,9.7 16.1,14.3 12,16.6 7.9,14.3 7.9,9.7" fill="${shade(c, 25)}" stroke="#111" stroke-width="0.5"/>
+          <circle cx="12" cy="12" r="1.5" fill="#111"/>
+        `);
+      }
+
+      function gearFine(c) {
+        const d = squaredGear(12, 12, 12, 8.2, 11.4, 0.36);
+        return svgWrap(`
+          <path d="${d}" fill="${c}"/>
+          <circle cx="12" cy="12" r="7.2" fill="none" stroke="${shade(c, -50)}" stroke-width="1.6"/>
+          <circle cx="12" cy="12" r="4.8" fill="#1a1c22"/>
+          <circle cx="12" cy="12" r="3.2" fill="none" stroke="${c}" stroke-width="1.1"/>
+          <circle cx="12" cy="12" r="1.4" fill="${c}"/>
+        `);
+      }
+
+      function gearWorn(c) {
+        const d = squaredGear(12, 12, 7, 6.8, 11.3, 0.38);
+        return svgWrap(`
+          <path d="${d}" fill="${shade(c, -20)}" stroke="#111" stroke-width="0.5"/>
+          <circle cx="8.2" cy="9.4" r="1.3" fill="rgba(0,0,0,0.28)"/>
+          <circle cx="15.4" cy="14.2" r="1.7" fill="rgba(0,0,0,0.22)"/>
+          <circle cx="13.6" cy="8.2" r="0.9" fill="rgba(255,255,255,0.18)"/>
+          <circle cx="12" cy="12" r="3.4" fill="#12141a"/>
+          <circle cx="12" cy="12" r="2.2" fill="${shade(c, -40)}"/>
+          <circle cx="12" cy="12" r="1.1" fill="#0c0d10"/>
+        `);
+      }
+
+      const sizes = [
+        { cls: "s", color: COLORS[0] },
+        { cls: "m", color: COLORS[3] },
+        { cls: "l", color: COLORS[1] },
+        { cls: "m", color: COLORS[4] },
+        { cls: "l", color: COLORS[2] },
+        { cls: "s", color: COLORS[5] },
+      ];
+
+      const grid = document.getElementById("grid");
+      for (const opt of OPTIONS) {
+        const pieces = sizes
+          .map(({ cls, color }) => `<div class="${cls}">${opt.draw(color)}</div>`)
+          .join("");
+        grid.insertAdjacentHTML(
+          "beforeend",
+          `<article class="card">
+            <h2>${opt.title}</h2>
+            <p class="desc">${opt.desc}</p>
+            <div class="stage">
+              <div class="zoom">${pieces}</div>
+              <span class="label">in-run zoom</span>
+            </div>
+          </article>`,
+        );
+      }
+    </script>
+  </body>
+</html>

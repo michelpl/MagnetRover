@@ -6,3 +6,11 @@ android/.gradle
 android/app/build
 android/build
 android/local.properties
+
+# Source artwork and local visual-validation outputs are not runtime assets.
+ConceptArt/
+tools/blender/output/
+tools/blender/*.blend
+tools/blender/*.blend1
+tools/blender/rover_drop/
+tools/*-check*.png

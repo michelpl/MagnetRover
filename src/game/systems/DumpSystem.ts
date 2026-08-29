@@ -1,10 +1,10 @@
+import { ignoreUiCamera } from '../cameras/GameCameras';
 import { Audio } from '../audio/Audio';
 import { Haptics } from '../audio/Haptics';
 import { GameConfig } from '../config/GameConfig';
 import type { Processor } from '../entities/Processor';
 import type { Rover } from '../entities/Rover';
 import type { Scrap } from '../entities/Scrap';
-import { Upgrades } from '../save/Upgrades';
 import type { CargoSystem } from './CargoSystem';
 
 /**
@@ -68,7 +68,6 @@ export class DumpSystem {
 
     Audio.play('dump', 0.4);
     Haptics.vibrate(8);
-    scene.cameras.main.shake(dumpIntervalMs, 0.0025);
 
     scene.tweens.add({
       targets: scrap,
@@ -97,6 +96,7 @@ export class DumpSystem {
       GameConfig.colors.processorAccent,
       0.8,
     );
+    ignoreUiCamera(scene, burst);
     scene.tweens.add({
       targets: burst,
       scaleX: 3.5,
@@ -114,8 +114,6 @@ export class DumpSystem {
     }
     scrap.destroy();
     this.processedCount += 1;
-    // Persist 1 coin per processed scrap immediately (US-028); retry keeps earned coins.
-    Upgrades.addCoins(1);
     this.onProcessed?.();
   }
 }

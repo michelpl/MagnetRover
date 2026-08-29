@@ -1,4 +1,5 @@
 import { GameObjects } from 'phaser';
+import { ignoreUiCamera } from '../cameras/GameCameras';
 import { Audio } from '../audio/Audio';
 import { Haptics } from '../audio/Haptics';
 import { GameConfig } from '../config/GameConfig';
@@ -181,7 +182,7 @@ export class CargoSystem {
     }
     const text = this.rover.scene.add
       .text(this.rover.x, this.rover.y - 70, 'FULL — dump at processor', {
-        fontFamily: 'Arial, sans-serif',
+        fontFamily: GameConfig.ui.fontFamily,
         fontSize: '28px',
         color: '#ffd43b',
         stroke: '#000000',
@@ -189,6 +190,7 @@ export class CargoSystem {
       })
       .setOrigin(0.5)
       .setDepth(1000);
+    ignoreUiCamera(this.rover.scene, text);
 
     this.fullCue = text;
     this.rover.scene.tweens.add({

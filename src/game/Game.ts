@@ -2,9 +2,9 @@ import { AUTO, Game, Scale } from 'phaser';
 import { GameConfig } from './config/GameConfig';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
+import { GarageScene } from './scenes/GarageScene';
 import { MenuScene } from './scenes/MenuScene';
 import { ResultScene } from './scenes/ResultScene';
-import { UpgradeScene } from './scenes/UpgradeScene';
 
 export function createGame(): Game {
   return new Game({
@@ -17,6 +17,10 @@ export function createGame(): Game {
       mode: Scale.FIT,
       autoCenter: Scale.CENTER_BOTH,
     },
-    scene: [BootScene, MenuScene, GameScene, ResultScene, UpgradeScene],
+    antialias: true,
+    pixelArt: false,
+    roundPixels: false,
+    mipmapFilter: 'LINEAR_MIPMAP_LINEAR',
+    scene: [BootScene, MenuScene, GarageScene, GameScene, ResultScene],
   });
 }

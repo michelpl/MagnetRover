@@ -1,8 +1,13 @@
+import { Save } from '../save/Save';
+
 /**
  * Light haptics via Capacitor on native builds; navigator.vibrate on web (US-036).
  */
 export const Haptics = {
   vibrate(durationMs = 12): void {
+    if (!Save.load().hapticsEnabled) {
+      return;
+    }
     void Haptics.vibrateAsync(durationMs);
   },
 

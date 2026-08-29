@@ -1,4 +1,4 @@
-import { GameObjects, Input, Math as PhaserMath, Scene } from 'phaser';
+import { GameObjects, Geom, Input, Math as PhaserMath, Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
 
 type ArrowKeys = {
@@ -8,7 +8,7 @@ type ArrowKeys = {
   right: Input.Keyboard.Key;
 };
 
-/** Unit-ish move vector; callers may pass raw joystick axes (merged then normalized). */
+/** Move vector. Keyboard is unit length; joystick keeps analog magnitude ≤ 1. */
 export type MoveInput = {
   x: number;
   y: number;
@@ -24,6 +24,7 @@ export class Rover extends GameObjects.Container {
   private joystickInputX = 0;
   private joystickInputY = 0;
   private moveSpeed: number = GameConfig.rover.speed;
+  private readonly hull: GameObjects.Sprite;
 
   public constructor(scene: Scene, x: number, y: number) {
     super(scene, x, y);
@@ -59,6 +60,10 @@ export class Rover extends GameObjects.Container {
       Input.Keyboard.KeyCodes.RIGHT,
     ]);
 
+    const { bodyWidth, bodyHeight } = GameConfig.rover;
+    const display = Math.max(bodyWidth, bodyHeight);
+    this.hull = new GameObjects.Sprite(scene, 0, 0, 'rover', 0);
+    this.hull.setDisplaySize(display, display);
     this.drawBody();
     scene.add.existing(this);
   }
@@ -84,7 +89,7 @@ export class Rover extends GameObjects.Container {
   }
 
   /**
-   * Inject joystick axes (typically -1..1). Merged with keyboard, then normalized once.
+   * Inject joystick axes (length ≤ 1). Stick input wins over keyboard while active.
    * Pass zeros when the stick is idle so keyboard-only play keeps working.
    */
   public setJoystickInput(x: number, y: number): void {
@@ -128,6 +133,61 @@ export class Rover extends GameObjects.Container {
         GameConfig.rover.rotationSmoothing * (delta / 16.6667),
       );
     }
+
+    this.syncHullFrame();
+  }
+
+  /**
+   * Push the rover out of a solid AABB (no physics plugin — circle vs rect).
+   */
+  public resolveSolidRect(rect: Geom.Rectangle): void {
+    const radius = Math.max(GameConfig.rover.bodyWidth, GameConfig.rover.bodyHeight) / 2;
+    const closestX = PhaserMath.Clamp(this.x, rect.left, rect.right);
+    const closestY = PhaserMath.Clamp(this.y, rect.top, rect.bottom);
+    let dx = this.x - closestX;
+    let dy = this.y - closestY;
+    const distSq = dx * dx + dy * dy;
+    const radiusSq = radius * radius;
+
+    if (distSq >= radiusSq) {
+      return;
+    }
+
+    if (distSq < 0.0001) {
+      const overlapLeft = this.x - rect.left;
+      const overlapRight = rect.right - this.x;
+      const overlapTop = this.y - rect.top;
+      const overlapBottom = rect.bottom - this.y;
+      const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
+      if (minOverlap === overlapLeft) {
+        this.x = rect.left - radius;
+        this.velocityX = Math.min(this.velocityX, 0);
+      } else if (minOverlap === overlapRight) {
+        this.x = rect.right + radius;
+        this.velocityX = Math.max(this.velocityX, 0);
+      } else if (minOverlap === overlapTop) {
+        this.y = rect.top - radius;
+        this.velocityY = Math.min(this.velocityY, 0);
+      } else {
+        this.y = rect.bottom + radius;
+        this.velocityY = Math.max(this.velocityY, 0);
+      }
+      this.clampToMap();
+      return;
+    }
+
+    const dist = Math.sqrt(distSq);
+    const nx = dx / dist;
+    const ny = dy / dist;
+    const push = radius - dist;
+    this.x += nx * push;
+    this.y += ny * push;
+    const into = this.velocityX * nx + this.velocityY * ny;
+    if (into < 0) {
+      this.velocityX -= into * nx;
+      this.velocityY -= into * ny;
+    }
+    this.clampToMap();
   }
 
   /** Debug-only: when true, uses `GameConfig.debug.boostSpeed` instead of normal speed. */
@@ -136,16 +196,18 @@ export class Rover extends GameObjects.Container {
   }
 
   /**
-   * Merge keyboard + joystick into one vector, then normalize so diagonals are not faster.
-   * Shared damp/rotate path — do not branch smoothing by input source.
+   * Keyboard is unit length (diagonals not faster). Joystick keeps analog magnitude.
+   * While the stick is active it wins so a partial tilt is not forced to full speed.
    */
   private readMoveInput(): MoveInput {
-    const keyboardX = Number(this.isHeld('right')) - Number(this.isHeld('left'));
-    const keyboardY = Number(this.isHeld('down')) - Number(this.isHeld('up'));
+    const stickX = this.joystickInputX;
+    const stickY = this.joystickInputY;
+    if (stickX !== 0 || stickY !== 0) {
+      return { x: stickX, y: stickY };
+    }
 
-    let x = keyboardX + this.joystickInputX;
-    let y = keyboardY + this.joystickInputY;
-
+    let x = Number(this.isHeld('right')) - Number(this.isHeld('left'));
+    let y = Number(this.isHeld('down')) - Number(this.isHeld('up'));
     if (x !== 0 || y !== 0) {
       const length = Math.hypot(x, y);
       x /= length;
@@ -158,8 +220,24 @@ export class Rover extends GameObjects.Container {
   private drawBody(): void {
     const graphics = this.scene.add.graphics();
     this.drawMagnetCue(graphics);
-    this.drawHull(graphics);
     this.add(graphics);
+    this.add(this.hull);
+    this.syncHullFrame();
+  }
+
+  /**
+   * Facing is baked into the 8-dir sheet. Counter-rotate the sprite so the
+   * container can still rotate the rear magnet in world space.
+   */
+  private syncHullFrame(): void {
+    const step = Math.PI / 4;
+    const wrapped = PhaserMath.Angle.Wrap(this.rotation);
+    let index = Math.round(wrapped / step) % 8;
+    if (index < 0) {
+      index += 8;
+    }
+    this.hull.setFrame(index);
+    this.hull.setRotation(-this.rotation);
   }
 
   /** Soft rear glow + ring only — full magnetRadius preview belongs to MagnetSystem (US-009). */
@@ -179,35 +257,15 @@ export class Rover extends GameObjects.Container {
     graphics.strokeCircle(0, magnetOffsetY, magnetRingRadius);
   }
 
-  private drawHull(graphics: GameObjects.Graphics): void {
-    const { bodyWidth, bodyHeight } = GameConfig.rover;
-    const { roverBody, roverCabin, roverAccent } = GameConfig.colors;
-
-    graphics.fillStyle(roverBody, 1);
-    graphics.fillRoundedRect(-bodyWidth / 2, -bodyHeight / 2, bodyWidth, bodyHeight, 10);
-
-    graphics.fillStyle(roverCabin, 1);
-    graphics.fillRoundedRect(-bodyWidth / 2 + 8, -bodyHeight / 2 + 10, bodyWidth - 16, 22, 6);
-
-    graphics.fillStyle(roverAccent, 1);
-    graphics.fillTriangle(
-      0,
-      -bodyHeight / 2 - 8,
-      -10,
-      -bodyHeight / 2 + 6,
-      10,
-      -bodyHeight / 2 + 6,
-    );
-  }
-
   private clampToMap(): void {
     const radius = Math.max(GameConfig.rover.bodyWidth, GameConfig.rover.bodyHeight) / 2;
+    const inset = GameConfig.map.wallInset + radius;
     const mapWidth = this.scene.registry.get('mapWidth') as number | undefined;
     const mapHeight = this.scene.registry.get('mapHeight') as number | undefined;
     const width = mapWidth ?? GameConfig.map.width;
     const height = mapHeight ?? GameConfig.map.height;
-    this.x = PhaserMath.Clamp(this.x, radius, width - radius);
-    this.y = PhaserMath.Clamp(this.y, radius, height - radius);
+    this.x = PhaserMath.Clamp(this.x, inset, width - inset);
+    this.y = PhaserMath.Clamp(this.y, inset, height - inset);
   }
 
   private damp(current: number, target: number, smoothing: number, delta: number): number {

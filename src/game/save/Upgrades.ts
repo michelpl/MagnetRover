@@ -5,6 +5,7 @@ export type UpgradeLine = keyof UpgradeLevels;
 
 export type AppliedUpgrades = {
   capacity: number;
+  battery: number;
   magnetRadius: number;
   speed: number;
 };
@@ -16,9 +17,10 @@ export const Upgrades = {
   },
 
   getApplied(levels: UpgradeLevels = Save.load().upgrades): AppliedUpgrades {
-    const { capacity, magnetRadius, speed } = GameConfig.upgrades;
+    const { capacity, battery, magnetRadius, speed } = GameConfig.upgrades;
     return {
       capacity: capacity.values[clampTier(levels.capacity, capacity.values.length)] ?? capacity.values[0],
+      battery: battery.values[clampTier(levels.battery, battery.values.length)] ?? battery.values[0],
       magnetRadius:
         magnetRadius.values[clampTier(levels.magnetRadius, magnetRadius.values.length)] ??
         magnetRadius.values[0],
@@ -33,6 +35,19 @@ export const Upgrades = {
       return null;
     }
     return table.costs[tier] ?? null;
+  },
+
+  nextValue(line: UpgradeLine, levels: UpgradeLevels): number | null {
+    const table = GameConfig.upgrades[line];
+    const tier = levels[line];
+    if (tier >= table.values.length - 1) {
+      return null;
+    }
+    return table.values[tier + 1] ?? null;
+  },
+
+  isMaxed(line: UpgradeLine, levels: UpgradeLevels): boolean {
+    return Upgrades.nextCost(line, levels) === null;
   },
 
   /** Returns false if unaffordable, maxed, or upgrades disabled. */

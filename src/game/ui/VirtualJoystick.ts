@@ -1,30 +1,37 @@
-import { GameObjects, Geom, Input, Scene } from 'phaser';
+import { GameObjects, Input, Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
 import type { MoveInput } from '../entities/Rover';
 
 /**
- * Semi-transparent virtual stick fixed at bottom-center.
- * Only the base circle is interactive — the rest of the screen stays free for camera / HUD.
+ * Semi-transparent virtual stick, fixed at bottom-center.
+ * Drag can start anywhere in the bottom capture band; the visual base does not move.
  */
 export class VirtualJoystick extends GameObjects.Container {
   private readonly base: GameObjects.Graphics;
   private readonly thumb: GameObjects.Graphics;
+  private readonly capture: GameObjects.Zone;
   private readonly baseRadius: number;
   private readonly thumbRadius: number;
+  private readonly deadzonePx: number;
 
   private axisX = 0;
   private axisY = 0;
+  private thumbX = 0;
+  private thumbY = 0;
   private activePointerId: number | null = null;
 
   public constructor(scene: Scene) {
-    const { baseRadius, thumbRadius, marginBottom } = GameConfig.joystick;
-    const x = GameConfig.viewport.width / 2;
-    const y = GameConfig.viewport.height - marginBottom;
+    const { baseRadius, thumbRadius, marginBottom, deadzone, captureHeightRatio } =
+      GameConfig.joystick;
+    const { width, height } = GameConfig.viewport;
+    const x = width / 2;
+    const y = height - marginBottom;
 
     super(scene, x, y);
 
     this.baseRadius = baseRadius;
     this.thumbRadius = thumbRadius;
+    this.deadzonePx = deadzone * baseRadius;
 
     this.base = scene.add.graphics();
     this.thumb = scene.add.graphics();
@@ -32,9 +39,12 @@ export class VirtualJoystick extends GameObjects.Container {
 
     this.redrawIdle();
 
-    this.setSize(baseRadius * 2, baseRadius * 2);
-    this.setInteractive(new Geom.Circle(0, 0, baseRadius), Geom.Circle.Contains);
-    this.on('pointerdown', this.handlePointerDown, this);
+    const captureHeight = height * captureHeightRatio;
+    this.capture = scene.add.zone(width / 2, height - captureHeight / 2, width, captureHeight);
+    this.capture.setScrollFactor(0);
+    this.capture.setDepth(1_500);
+    this.capture.setInteractive();
+    this.capture.on('pointerdown', this.handlePointerDown, this);
 
     scene.input.on('pointermove', this.handlePointerMove, this);
     scene.input.on('pointerup', this.handlePointerUp, this);
@@ -45,16 +55,32 @@ export class VirtualJoystick extends GameObjects.Container {
     scene.add.existing(this);
   }
 
-  /** Normalized axes with length ≤ 1. Zeros when idle. */
+  /** Analog axes with length ≤ 1. Zeros when idle or inside the deadzone. */
   public getAxis(): MoveInput {
     return { x: this.axisX, y: this.axisY };
   }
 
+  /** Drop the current stick so pause / overlays do not keep the rover moving. */
+  public release(): void {
+    this.clearStick();
+    this.redrawIdle();
+  }
+
   public destroy(fromScene?: boolean): void {
+    this.capture.off('pointerdown', this.handlePointerDown, this);
+    this.capture.destroy();
     this.scene.input.off('pointermove', this.handlePointerMove, this);
     this.scene.input.off('pointerup', this.handlePointerUp, this);
     this.scene.input.off('pointerupoutside', this.handlePointerUp, this);
     super.destroy(fromScene);
+  }
+
+  private clearStick(): void {
+    this.activePointerId = null;
+    this.axisX = 0;
+    this.axisY = 0;
+    this.thumbX = 0;
+    this.thumbY = 0;
   }
 
   private handlePointerDown(pointer: Input.Pointer): void {
@@ -81,9 +107,7 @@ export class VirtualJoystick extends GameObjects.Container {
       return;
     }
 
-    this.activePointerId = null;
-    this.axisX = 0;
-    this.axisY = 0;
+    this.clearStick();
     this.redrawIdle();
   }
 
@@ -95,12 +119,25 @@ export class VirtualJoystick extends GameObjects.Container {
     if (length <= 0) {
       this.axisX = 0;
       this.axisY = 0;
+      this.thumbX = 0;
+      this.thumbY = 0;
       return;
     }
 
     const clamped = Math.min(length, this.baseRadius);
-    this.axisX = (dx / length) * (clamped / this.baseRadius);
-    this.axisY = (dy / length) * (clamped / this.baseRadius);
+    this.thumbX = (dx / length) * clamped;
+    this.thumbY = (dy / length) * clamped;
+
+    if (length <= this.deadzonePx) {
+      this.axisX = 0;
+      this.axisY = 0;
+      return;
+    }
+
+    const usable = this.baseRadius - this.deadzonePx;
+    const analog = (clamped - this.deadzonePx) / usable;
+    this.axisX = (dx / length) * analog;
+    this.axisY = (dy / length) * analog;
   }
 
   private redrawIdle(): void {
@@ -118,8 +155,6 @@ export class VirtualJoystick extends GameObjects.Container {
 
   private redrawActive(): void {
     const { color, opacity } = GameConfig.joystick;
-    const thumbX = this.axisX * this.baseRadius;
-    const thumbY = this.axisY * this.baseRadius;
 
     this.base.clear();
     this.base.lineStyle(3, color, opacity);
@@ -130,8 +165,8 @@ export class VirtualJoystick extends GameObjects.Container {
     this.thumb.setVisible(true);
     this.thumb.clear();
     this.thumb.fillStyle(color, opacity);
-    this.thumb.fillCircle(thumbX, thumbY, this.thumbRadius);
+    this.thumb.fillCircle(this.thumbX, this.thumbY, this.thumbRadius);
     this.thumb.lineStyle(2, color, Math.min(1, opacity + 0.25));
-    this.thumb.strokeCircle(thumbX, thumbY, this.thumbRadius);
+    this.thumb.strokeCircle(this.thumbX, this.thumbY, this.thumbRadius);
   }
 }

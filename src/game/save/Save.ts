@@ -1,5 +1,9 @@
+import { getMaxLevelId, getNextLevelId } from '../config/Levels';
+import { isDebugMode } from '../config/GameConfig';
+
 export type UpgradeLevels = {
   capacity: number;
+  battery: number;
   magnetRadius: number;
   speed: number;
 };
@@ -8,21 +12,25 @@ export type SaveData = {
   coins: number;
   currentLevel: number;
   upgrades: UpgradeLevels;
-  /** First-run tutorial seen (US-038). */
-  tutorialSeen: boolean;
+  tutorialDone: boolean;
+  sfxMuted: boolean;
+  hapticsEnabled: boolean;
 };
 
 const SAVE_KEY = 'magnetRoverSaveV1';
 
 const DEFAULT_SAVE: SaveData = {
-  coins: 0,
+  coins: isDebugMode ? 999 : 0,
   currentLevel: 1,
+  tutorialDone: false,
+  sfxMuted: false,
+  hapticsEnabled: true,
   upgrades: {
     capacity: 0,
+    battery: 0,
     magnetRadius: 0,
     speed: 0,
   },
-  tutorialSeen: false,
 };
 
 function isUpgradeLevels(value: unknown): value is UpgradeLevels {
@@ -33,7 +41,8 @@ function isUpgradeLevels(value: unknown): value is UpgradeLevels {
   return (
     typeof record.capacity === 'number' &&
     typeof record.magnetRadius === 'number' &&
-    typeof record.speed === 'number'
+    typeof record.speed === 'number' &&
+    (typeof record.battery === 'number' || record.battery === undefined)
   );
 }
 
@@ -45,8 +54,7 @@ function isSaveData(value: unknown): value is SaveData {
   return (
     typeof record.coins === 'number' &&
     typeof record.currentLevel === 'number' &&
-    isUpgradeLevels(record.upgrades) &&
-    typeof record.tutorialSeen === 'boolean'
+    isUpgradeLevels(record.upgrades)
   );
 }
 
@@ -54,9 +62,31 @@ function cloneDefaults(): SaveData {
   return {
     coins: DEFAULT_SAVE.coins,
     currentLevel: DEFAULT_SAVE.currentLevel,
+    tutorialDone: DEFAULT_SAVE.tutorialDone,
+    sfxMuted: DEFAULT_SAVE.sfxMuted,
+    hapticsEnabled: DEFAULT_SAVE.hapticsEnabled,
     upgrades: { ...DEFAULT_SAVE.upgrades },
-    tutorialSeen: DEFAULT_SAVE.tutorialSeen,
   };
+}
+
+function clampCurrentLevel(id: number): number {
+  const max = getMaxLevelId();
+  if (!Number.isFinite(id)) {
+    return 1;
+  }
+  return Math.min(max, Math.max(1, Math.floor(id)));
+}
+
+function readFlag(value: unknown, key: string, defaultValue: boolean): boolean {
+  if (typeof value !== 'object' || value === null) {
+    return defaultValue;
+  }
+  const flag = (value as Record<string, unknown>)[key];
+  return typeof flag === 'boolean' ? flag : defaultValue;
+}
+
+function readTutorialDone(value: unknown): boolean {
+  return readFlag(value, 'tutorialDone', false);
 }
 
 /** localStorage save/load — shape stays Capacitor-ready (US-029). */
@@ -72,7 +102,19 @@ export const Save = {
         console.warn('Save data corrupt; resetting to defaults');
         return cloneDefaults();
       }
-      return parsed;
+      return {
+        coins: parsed.coins,
+        currentLevel: clampCurrentLevel(parsed.currentLevel),
+        tutorialDone: readTutorialDone(parsed),
+        sfxMuted: readFlag(parsed, 'sfxMuted', false),
+        hapticsEnabled: readFlag(parsed, 'hapticsEnabled', true),
+        upgrades: {
+          capacity: parsed.upgrades.capacity,
+          battery: parsed.upgrades.battery ?? 0,
+          magnetRadius: parsed.upgrades.magnetRadius,
+          speed: parsed.upgrades.speed,
+        },
+      };
     } catch (error) {
       console.warn('Failed to load save; resetting to defaults', error);
       return cloneDefaults();
@@ -92,5 +134,19 @@ export const Save = {
     mutator(data);
     Save.write(data);
     return data;
+  },
+
+  /** Persist a win once: coins plus highest unlocked stage (never decreases). */
+  applyWin(levelId: number, coinsEarned: number): SaveData {
+    return Save.update((data) => {
+      data.coins += coinsEarned;
+      data.currentLevel = Math.max(data.currentLevel, getNextLevelId(levelId));
+    });
+  },
+
+  markTutorialDone(): SaveData {
+    return Save.update((data) => {
+      data.tutorialDone = true;
+    });
   },
 };

@@ -1,4 +1,5 @@
 import type { Scene } from 'phaser';
+import { ignoreUiCamera } from '../cameras/GameCameras';
 import { Audio } from '../audio/Audio';
 import { GameConfig } from '../config/GameConfig';
 import type { Scrap } from '../entities/Scrap';
@@ -51,7 +52,7 @@ export class RegionClearSystem {
     Audio.play('clean', 0.45);
     const text = this.scene.add
       .text(x, y, 'Clean!', {
-        fontFamily: 'Arial, sans-serif',
+        fontFamily: GameConfig.ui.fontFamily,
         fontSize: '40px',
         color: '#69db7c',
         stroke: '#000000',
@@ -59,6 +60,7 @@ export class RegionClearSystem {
       })
       .setOrigin(0.5)
       .setDepth(1500);
+    ignoreUiCamera(this.scene, text);
 
     this.scene.tweens.add({
       targets: text,
@@ -77,6 +79,7 @@ export class RegionClearSystem {
         GameConfig.colors.processorAccent,
         0.9,
       );
+      ignoreUiCamera(this.scene, spark);
       const angle = (Math.PI * 2 * i) / 8;
       this.scene.tweens.add({
         targets: spark,

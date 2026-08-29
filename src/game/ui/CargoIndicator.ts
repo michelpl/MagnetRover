@@ -9,7 +9,7 @@ export class CargoIndicator {
     const { marginX, marginTop } = GameConfig.hud;
     this.text = scene.add
       .text(GameConfig.viewport.width - marginX, marginTop, '0 / 20', {
-        fontFamily: 'Arial, sans-serif',
+        fontFamily: GameConfig.ui.fontFamily,
         fontSize: '28px',
         color: '#ffffff',
         stroke: '#000000',
