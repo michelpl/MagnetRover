@@ -1,0 +1,150 @@
+"<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Painel - Progresso da Limpeza</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    background: #c47171;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  body {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 4px 6px;
+  }
+
+  .panel {
+    position: relative;
+    width: 272px;
+    height: 55px;
+    border-radius: 15px;
+    background:
+      linear-gradient(180deg,
+        rgba(39, 59, 82, 0.96) 0%,
+        rgba(20, 35, 53, 0.97) 44%,
+        rgba(8, 18, 30, 0.98) 100%);
+    border: 1px solid rgba(101, 145, 190, 0.55);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      inset 0 -2px 5px rgba(0,0,0,0.65),
+      0 0 0 1px rgba(8, 17, 28, 0.85),
+      0 2px 4px rgba(0,0,0,0.85);
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: "";
+    position: absolute;
+    inset: 1px 10px auto 10px;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(128, 177, 226, 0.42),
+      transparent
+    );
+  }
+
+  .panel::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 25px;
+    height: 1px;
+    background: rgba(0,0,0,0.22);
+  }
+
+  .title {
+    position: absolute;
+    top: 8px;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    color: #f5f7fa;
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: 0.15px;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.95);
+  }
+
+  .bar-wrap {
+    position: absolute;
+    left: 16px;
+    top: 31px;
+    width: 190px;
+    height: 14px;
+    border-radius: 8px;
+    padding: 2px;
+    background: linear-gradient(180deg, #15293a 0%, #091724 100%);
+    border: 1px solid rgba(45, 73, 98, 0.7);
+    box-shadow:
+      inset 0 2px 3px rgba(0,0,0,0.72),
+      0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .bar {
+    height: 100%;
+    width: 56%;
+    border-radius: 6px;
+    background: linear-gradient(
+      180deg,
+      #73f124 0%,
+      #52dc18 52%,
+      #40bd12 100%
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.28),
+      0 0 4px rgba(93, 232, 30, 0.22);
+    position: relative;
+  }
+
+  .bar::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    left: 3px;
+    right: 3px;
+    height: 2px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.14);
+  }
+
+  .value {
+    position: absolute;
+    right: 16px;
+    top: 31px;
+    color: #64f321;
+    font-size: 17px;
+    line-height: 14px;
+    font-weight: 600;
+    text-shadow:
+      0 1px 1px rgba(0,0,0,0.9),
+      0 0 3px rgba(83,229,25,0.18);
+  }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">PROGRESSO DA LIMPEZA</div>
+
+    <div class="bar-wrap">
+      <div class="bar"></div>
+    </div>
+
+    <div class="value">64%</div>
+  </div>
+</body>
+</html>

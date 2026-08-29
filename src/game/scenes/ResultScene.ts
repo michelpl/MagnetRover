@@ -2,16 +2,16 @@ import { Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
 import { getNextLevelId } from '../config/Levels';
 import { Save } from '../save/Save';
-import { Upgrades } from '../save/Upgrades';
 
 export type ResultPayload = {
   outcome: 'Won' | 'Lost';
   cleanPercentage: number;
   levelId: number;
+  coinsEarned: number;
 };
 
 /**
- * Victory / defeat summary with Continue or Retry (US-020).
+ * Victory / defeat summary. Win rewards apply once on create.
  * Registry key: `resultPayload`.
  */
 export class ResultScene extends Scene {
@@ -24,18 +24,19 @@ export class ResultScene extends Scene {
     const outcome = payload?.outcome ?? 'Won';
     const clean = Math.floor(payload?.cleanPercentage ?? 0);
     const levelId = payload?.levelId ?? 1;
-    const coins = Save.load().coins;
+    const coinsEarned = payload?.coinsEarned ?? 0;
+    const isWin = outcome === 'Won';
+    const save = this.settleWin(isWin, levelId, coinsEarned);
 
     const { width, height } = GameConfig.viewport;
     this.add.rectangle(width / 2, height / 2, width, height, 0x0d0d10, 0.92);
 
-    const isWin = outcome === 'Won';
     const title = isWin ? 'Victory' : 'Defeat';
     const color = isWin ? '#69db7c' : '#fa5252';
 
     this.add
-      .text(width / 2, height / 2 - 200, title, {
-        fontFamily: 'Arial, sans-serif',
+      .text(width / 2, height / 2 - 320, title, {
+        fontFamily: GameConfig.ui.fontFamily,
         fontSize: '72px',
         color,
         stroke: '#000000',
@@ -44,51 +45,79 @@ export class ResultScene extends Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, height / 2 - 80, `Clean ${clean}%`, {
-        fontFamily: 'Arial, sans-serif',
+      .text(width / 2, height / 2 - 200, `Clean ${clean}%`, {
+        fontFamily: GameConfig.ui.fontFamily,
         fontSize: '36px',
         color: '#ced4da',
       })
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, height / 2 - 20, `Coins: ${coins}`, {
-        fontFamily: 'Arial, sans-serif',
+      .text(width / 2, height / 2 - 140, `+${coinsEarned} coins this run`, {
+        fontFamily: GameConfig.ui.fontFamily,
         fontSize: '32px',
         color: '#ffd43b',
       })
       .setOrigin(0.5);
 
+    this.add
+      .text(width / 2, height / 2 - 80, `Wallet: ${save.coins}`, {
+        fontFamily: GameConfig.ui.fontFamily,
+        fontSize: '28px',
+        color: '#adb5bd',
+      })
+      .setOrigin(0.5);
+
     if (isWin) {
-      this.addButton(width / 2, height / 2 + 140, 'Continue', () => {
-        const nextId = getNextLevelId(levelId);
-        Save.update((data) => {
-          data.currentLevel = nextId;
-        });
-        this.registry.set('activeLevelId', nextId);
-        if (Upgrades.isEnabled()) {
-          this.scene.start('UpgradeScene');
-        } else {
-          this.scene.start('GameScene');
-        }
+      const nextId = getNextLevelId(levelId);
+      this.addButton(width / 2, height / 2 + 40, 'Garage', GameConfig.colors.magnetGlow, () => {
+        this.scene.start('GarageScene');
       });
+      this.addButton(width / 2, height / 2 + 150, 'Stages', GameConfig.colors.roverAccent, () => {
+        this.scene.start('MenuScene');
+      });
+      if (nextId !== levelId) {
+        this.addButton(width / 2, height / 2 + 260, 'Next', GameConfig.colors.processorAccent, () => {
+          this.registry.set('activeLevelId', nextId);
+          this.scene.start('GameScene');
+        });
+      }
     } else {
-      this.addButton(width / 2, height / 2 + 140, 'Retry', () => {
+      this.addButton(width / 2, height / 2 + 80, 'Retry', GameConfig.colors.roverAccent, () => {
         this.registry.set('activeLevelId', levelId);
         this.scene.start('GameScene');
+      });
+      this.addButton(width / 2, height / 2 + 190, 'Menu', GameConfig.colors.roverCabin, () => {
+        this.scene.start('MenuScene');
       });
     }
   }
 
-  private addButton(x: number, y: number, label: string, onClick: () => void): void {
-    const bg = this.add
-      .rectangle(x, y, 360, 80, GameConfig.colors.roverAccent, 1)
-      .setInteractive({ useHandCursor: true });
+  private settleWin(isWin: boolean, levelId: number, coinsEarned: number) {
+    if (!isWin) {
+      return Save.load();
+    }
+    if (this.registry.get('resultSettled') === true) {
+      return Save.load();
+    }
+    const save = Save.applyWin(levelId, coinsEarned);
+    this.registry.set('resultSettled', true);
+    return save;
+  }
+
+  private addButton(
+    x: number,
+    y: number,
+    label: string,
+    fill: number,
+    onClick: () => void,
+  ): void {
+    const bg = this.add.rectangle(x, y, 360, 80, fill, 1).setInteractive({ useHandCursor: true });
     const text = this.add
       .text(x, y, label, {
-        fontFamily: 'Arial, sans-serif',
+        fontFamily: GameConfig.ui.fontFamily,
         fontSize: '36px',
-        color: '#0d0d10',
+        color: fill === GameConfig.colors.roverCabin ? '#f8f9fa' : '#0d0d10',
       })
       .setOrigin(0.5);
 

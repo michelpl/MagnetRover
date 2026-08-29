@@ -1,4 +1,5 @@
 import type { Scene } from 'phaser';
+import { Save } from '../save/Save';
 
 export type SfxKey =
   | 'attract'
@@ -32,6 +33,9 @@ export const Audio = {
   play(key: SfxKey, volume = 0.45): void {
     try {
       if (!boundScene) {
+        return;
+      }
+      if (Save.load().sfxMuted) {
         return;
       }
       if (!boundScene.cache.audio.exists(key)) {

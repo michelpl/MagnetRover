@@ -1,5 +1,6 @@
 import { GameObjects, Geom, Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
+import { setContainerInteractive } from './setContainerInteractive';
 
 const BUTTON_WIDTH = 120;
 const BUTTON_HEIGHT = 48;
@@ -26,7 +27,7 @@ export class DebugSpeedButton extends GameObjects.Container {
     this.background = scene.add.graphics();
     this.label = scene.add
       .text(0, 0, this.labelText(), {
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: GameConfig.ui.fontFamily,
         fontSize: '18px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -37,7 +38,8 @@ export class DebugSpeedButton extends GameObjects.Container {
     this.redraw();
 
     this.setSize(BUTTON_WIDTH, BUTTON_HEIGHT);
-    this.setInteractive(
+    setContainerInteractive(
+      this,
       new Geom.Rectangle(-BUTTON_WIDTH / 2, -BUTTON_HEIGHT / 2, BUTTON_WIDTH, BUTTON_HEIGHT),
       Geom.Rectangle.Contains,
     );

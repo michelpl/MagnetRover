@@ -1,88 +1,185 @@
-import type { Scene } from 'phaser';
+import { GameObjects, Geom, Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
 import { Save } from '../save/Save';
+import { drawNavyPanel } from './navyPanel';
+import { setContainerInteractive } from './setContainerInteractive';
 
-const STEPS = [
-  'Drag to drive the rover',
-  'Back into scrap — the rear magnet pulls cubes',
-  'When FULL, dump at the orange processor',
-  'Clear every cube before energy runs out',
-] as const;
+const STEPS: readonly { title: string; body: string }[] = [
+  {
+    title: 'Drive',
+    body: 'Slide the stick to move the rover.',
+  },
+  {
+    title: 'Magnet',
+    body: 'The magnet sits behind you. Sweep it through scrap.',
+  },
+  {
+    title: 'Queue',
+    body: 'Cubes lock into a chain behind the rover.',
+  },
+  {
+    title: 'Dump',
+    body: 'Drive onto the green pad to unload.',
+  },
+];
 
-/** Skippable first-run overlay (US-038). No quest system. */
+const CARD_WIDTH = 920;
+const CARD_HEIGHT = 280;
+
+export type TutorialSignals = {
+  moving: boolean;
+  attracted: boolean;
+  queued: boolean;
+  dumped: boolean;
+};
+
+/**
+ * First-run cues on stage 1. Joystick stays free; only Skip is interactive.
+ */
 export class TutorialOverlay {
-  private root: Phaser.GameObjects.Container | null = null;
-  private stepIndex = 0;
-  private bodyText: Phaser.GameObjects.Text | null = null;
+  private readonly root: GameObjects.Container;
+  private readonly title: GameObjects.Text;
+  private readonly body: GameObjects.Text;
+  private readonly progress: GameObjects.Text;
+  private step = 0;
+  private done = false;
 
-  public constructor(private readonly scene: Scene) {}
+  public constructor(scene: Scene) {
+    const { width } = GameConfig.viewport;
+    const cardX = (width - CARD_WIDTH) / 2;
+    const cardY = 430;
 
-  public tryShow(): void {
-    const save = Save.load();
-    if (save.tutorialSeen) {
-      return;
-    }
-    this.build();
-  }
+    const panel = scene.add.graphics();
+    drawNavyPanel(panel, CARD_WIDTH, CARD_HEIGHT, 24);
 
-  private build(): void {
-    const { width, height } = GameConfig.viewport;
-    const panel = this.scene.add.rectangle(0, 0, width - 80, 420, 0x000000, 0.78);
-    this.bodyText = this.scene.add
-      .text(0, -40, STEPS[0], {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '36px',
-        color: '#ffffff',
-        align: 'center',
-        wordWrap: { width: width - 160 },
-      })
-      .setOrigin(0.5);
-
-    const next = this.scene.add
-      .text(0, 100, 'Next', {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '32px',
+    this.title = scene.add
+      .text(CARD_WIDTH / 2, 36, '', {
+        fontFamily: GameConfig.ui.fontFamily,
+        fontSize: '40px',
         color: '#74c0fc',
+        stroke: '#000000',
+        strokeThickness: 4,
       })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+      .setOrigin(0.5, 0);
 
-    const skip = this.scene.add
-      .text(0, 160, 'Skip', {
-        fontFamily: 'Arial, sans-serif',
+    this.body = scene.add
+      .text(CARD_WIDTH / 2, 100, '', {
+        fontFamily: GameConfig.ui.fontFamily,
         fontSize: '28px',
+        color: '#ced4da',
+        align: 'center',
+        wordWrap: { width: CARD_WIDTH - 80 },
+      })
+      .setOrigin(0.5, 0);
+
+    this.progress = scene.add
+      .text(48, CARD_HEIGHT - 52, '', {
+        fontFamily: GameConfig.ui.fontFamily,
+        fontSize: '22px',
         color: '#adb5bd',
       })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+      .setOrigin(0, 0.5);
 
-    next.on('pointerup', () => this.advance());
-    skip.on('pointerup', () => this.finish());
+    const skip = this.makeSkip(scene, CARD_WIDTH - 100, CARD_HEIGHT - 52);
 
-    this.root = this.scene.add.container(width / 2, height / 2 - 120, [
+    this.root = scene.add.container(cardX, cardY, [
       panel,
-      this.bodyText,
-      next,
+      this.title,
+      this.body,
+      this.progress,
       skip,
     ]);
     this.root.setScrollFactor(0);
-    this.root.setDepth(3000);
+    this.root.setDepth(8_500);
+    scene.cameras.main.ignore(this.root);
+
+    this.refreshCopy();
+  }
+
+  public get isActive(): boolean {
+    return !this.done;
+  }
+
+  public sync(signals: TutorialSignals): void {
+    if (this.done) {
+      return;
+    }
+
+    if (this.step === 0 && signals.moving) {
+      this.advance();
+      return;
+    }
+    if (this.step === 1 && (signals.attracted || signals.queued)) {
+      this.advance();
+      return;
+    }
+    if (this.step === 2 && signals.queued) {
+      this.advance();
+      return;
+    }
+    if (this.step === 3 && signals.dumped) {
+      this.complete();
+    }
+  }
+
+  public destroy(): void {
+    this.done = true;
+    this.root.destroy();
+  }
+
+  private skip(): void {
+    this.complete();
   }
 
   private advance(): void {
-    this.stepIndex += 1;
-    if (this.stepIndex >= STEPS.length) {
-      this.finish();
+    this.step += 1;
+    if (this.step >= STEPS.length) {
+      this.complete();
       return;
     }
-    this.bodyText?.setText(STEPS[this.stepIndex]);
+    this.refreshCopy();
   }
 
-  private finish(): void {
-    Save.update((data) => {
-      data.tutorialSeen = true;
-    });
-    this.root?.destroy(true);
-    this.root = null;
+  private complete(): void {
+    if (this.done) {
+      return;
+    }
+    Save.markTutorialDone();
+    this.destroy();
+  }
+
+  private refreshCopy(): void {
+    const cue = STEPS[this.step];
+    if (!cue) {
+      return;
+    }
+    this.title.setText(cue.title);
+    this.body.setText(cue.body);
+    this.progress.setText(`${this.step + 1} / ${STEPS.length}`);
+  }
+
+  private makeSkip(scene: Scene, x: number, y: number): GameObjects.Container {
+    const label = 'SKIP';
+    const btnW = 160;
+    const btnH = 56;
+    const btn = scene.add.container(x, y);
+    const bg = scene.add.rectangle(0, 0, btnW, btnH, GameConfig.colors.roverCabin, 1);
+    bg.setStrokeStyle(2, GameConfig.colors.mapBorder);
+    const text = scene.add
+      .text(0, 0, label, {
+        fontFamily: GameConfig.ui.fontFamily,
+        fontSize: '26px',
+        color: '#f8f9fa',
+      })
+      .setOrigin(0.5);
+    btn.add([bg, text]);
+    btn.setSize(btnW, btnH);
+    setContainerInteractive(
+      btn,
+      new Geom.Rectangle(-btnW / 2, -btnH / 2, btnW, btnH),
+      Geom.Rectangle.Contains,
+    );
+    btn.on('pointerup', () => this.skip());
+    return btn;
   }
 }

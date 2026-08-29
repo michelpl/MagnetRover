@@ -1,16 +1,16 @@
 import { GameConfig } from '../config/GameConfig';
 
 /**
- * Run energy: starts at level initialEnergy, drains only while the rover moves.
- * No regen; no drain on collect/dump/idle.
+ * Run energy: starts at full rover battery, drains only while moving.
+ * Drain rate is global. Pickups restore; no drain on collect/dump/idle.
  */
 export class EnergySystem {
   public energy: number;
   public readonly maxEnergy: number;
 
-  public constructor(initialEnergy: number) {
-    this.maxEnergy = initialEnergy;
-    this.energy = initialEnergy;
+  public constructor(maxEnergy: number) {
+    this.maxEnergy = maxEnergy;
+    this.energy = maxEnergy;
   }
 
   public get ratio(): number {

@@ -2,7 +2,7 @@ MVP — Magnet Rover
 
 1. Objetivo do jogo
 
-Criar um jogo mobile hiper casual, top-down, simples e satisfatório, no qual o jogador controla um pequeno veículo equipado com um sistema magnético.
+Criar um jogo mobile hiper casual, top-down, simples e satisfatório, no qual o jogador controla um pequeno veículo equipado com um sistema magnético traseiro.
 
 O objetivo de cada fase é explorar o mapa, coletar todos os objetos metálicos espalhados, descarregar a carga em uma processadora e limpar 100% da fase antes que a energia do veículo acabe.
 
