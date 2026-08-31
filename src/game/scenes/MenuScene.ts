@@ -4,6 +4,7 @@ import { Save } from '../save/Save';
 import { ensureGradientTextTexture } from '../ui/gradientText';
 import { HubBar } from '../ui/HubBar';
 import { addCoverBackground } from '../ui/hubBackground';
+import { viewSize } from '../ui/viewSize';
 import {
   ensurePlayChromeTexture,
   ensurePlayShadowTexture,
@@ -32,7 +33,7 @@ export class MenuScene extends Scene {
   }
 
   public create(): void {
-    const { width, height } = GameConfig.viewport;
+    const { width, height } = viewSize(this);
     const save = Save.load();
 
     addCoverBackground(this, 'stages-bg');

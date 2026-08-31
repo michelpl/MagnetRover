@@ -1,17 +1,18 @@
 import { GameObjects, Geom, Scene } from 'phaser';
+import { ignoreWorldCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
+import { settingsHitRect } from './hudHit';
 import { setContainerInteractive } from './setContainerInteractive';
 import { drawNavyPanel } from './navyPanel';
+import { bindViewResize } from './viewSize';
 
 /** Opens the shared settings modal. */
 export class SettingsButton extends GameObjects.Container {
   public constructor(scene: Scene, fixedToCamera = false, onOpen?: () => void) {
-    const { width } = GameConfig.viewport;
-    const { gearSize, gearMarginRight, marginTop } = GameConfig.topControls;
-    const x = width - gearMarginRight - gearSize / 2;
-    const y = marginTop + gearSize / 2;
-    super(scene, x, y);
+    const rect = settingsHitRect(scene);
+    super(scene, rect.left + rect.width / 2, rect.top + rect.height / 2);
 
+    const { gearSize } = GameConfig.topControls;
     const panel = scene.add.graphics();
     drawNavyPanel(panel, gearSize, gearSize, 16);
     panel.setPosition(-gearSize / 2, -gearSize / 2);
@@ -35,8 +36,15 @@ export class SettingsButton extends GameObjects.Container {
 
     if (fixedToCamera) {
       this.setScrollFactor(0);
+      ignoreWorldCamera(scene, this);
     }
     this.setDepth(2100);
     scene.add.existing(this);
+    bindViewResize(scene, () => this.layout());
+  }
+
+  private layout(): void {
+    const rect = settingsHitRect(this.scene);
+    this.setPosition(rect.left + rect.width / 2, rect.top + rect.height / 2);
   }
 }

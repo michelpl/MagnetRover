@@ -2,6 +2,7 @@ import { Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
 import { getNextLevelId } from '../config/Levels';
 import { Save } from '../save/Save';
+import { viewSize } from '../ui/viewSize';
 
 export type ResultPayload = {
   outcome: 'Won' | 'Lost';
@@ -28,7 +29,7 @@ export class ResultScene extends Scene {
     const isWin = outcome === 'Won';
     const save = this.settleWin(isWin, levelId, coinsEarned);
 
-    const { width, height } = GameConfig.viewport;
+    const { width, height } = viewSize(this);
     this.add.rectangle(width / 2, height / 2, width, height, 0x0d0d10, 0.92);
 
     const title = isWin ? 'Victory' : 'Defeat';

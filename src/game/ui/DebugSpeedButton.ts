@@ -1,6 +1,8 @@
 import { GameObjects, Geom, Scene } from 'phaser';
+import { ignoreWorldCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
 import { setContainerInteractive } from './setContainerInteractive';
+import { bindViewResize, safeInsets, viewSize } from './viewSize';
 
 const BUTTON_WIDTH = 120;
 const BUTTON_HEIGHT = 48;
@@ -19,9 +21,7 @@ export class DebugSpeedButton extends GameObjects.Container {
   private readonly onToggle: ToggleHandler;
 
   public constructor(scene: Scene, onToggle: ToggleHandler) {
-    const x = GameConfig.viewport.width - MARGIN - BUTTON_WIDTH / 2;
-    const y = MARGIN + BUTTON_HEIGHT / 2;
-    super(scene, x, y);
+    super(scene, 0, 0);
 
     this.onToggle = onToggle;
     this.background = scene.add.graphics();
@@ -48,6 +48,16 @@ export class DebugSpeedButton extends GameObjects.Container {
     this.setScrollFactor(0);
     this.setDepth(10_000);
     scene.add.existing(this);
+    ignoreWorldCamera(scene, this);
+    bindViewResize(scene, () => this.layout());
+  }
+
+  private layout(): void {
+    const inset = safeInsets(this.scene);
+    this.setPosition(
+      viewSize(this.scene).width - inset.right - MARGIN - BUTTON_WIDTH / 2,
+      inset.top + MARGIN + BUTTON_HEIGHT / 2,
+    );
   }
 
   private handlePointerDown(): void {

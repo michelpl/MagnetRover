@@ -1,12 +1,15 @@
 import { GameObjects, Scene } from 'phaser';
+import { ignoreWorldCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
 import { Save } from '../save/Save';
+import { bindViewResize, viewSize } from './viewSize';
 
 /**
  * Full-screen overlay: Continue resumes, Quit returns to the menu, mute toggles persist.
  */
 export class PauseModal {
   private readonly root: GameObjects.Container;
+  private readonly dim: GameObjects.Rectangle;
   private readonly sfxLabel: GameObjects.Text;
   private readonly hapticsLabel: GameObjects.Text;
 
@@ -14,14 +17,13 @@ export class PauseModal {
     scene: Scene,
     handlers: { onContinue: () => void; onQuit: () => void },
   ) {
-    const { width, height } = GameConfig.viewport;
+    const { width, height } = viewSize(scene);
     const cx = width / 2;
     const cy = height / 2;
 
-    const dim = scene.add
+    this.dim = scene.add
       .rectangle(0, 0, width, height, 0x0d0d10, 0.82)
-      .setOrigin(0, 0)
-      .setInteractive();
+      .setOrigin(0, 0);
 
     const panel = scene.add.rectangle(cx, cy, 720, 760, 0x1e1e26, 1);
     panel.setStrokeStyle(4, GameConfig.colors.mapBorder);
@@ -70,7 +72,7 @@ export class PauseModal {
     );
 
     this.root = scene.add.container(0, 0, [
-      dim,
+      this.dim,
       panel,
       title,
       ...sfxBtn.parts,
@@ -80,17 +82,38 @@ export class PauseModal {
     ]);
     this.root.setScrollFactor(0);
     this.root.setDepth(15_000);
-    this.root.setVisible(false);
+    ignoreWorldCamera(scene, this.root);
+    this.setOpen(false);
     this.refreshToggles();
+
+    bindViewResize(scene, () => {
+      const size = viewSize(scene);
+      this.dim.setSize(size.width, size.height);
+    });
   }
 
   public show(): void {
     this.refreshToggles();
-    this.root.setVisible(true);
+    this.setOpen(true);
   }
 
   public hide(): void {
-    this.root.setVisible(false);
+    this.setOpen(false);
+  }
+
+  private setOpen(open: boolean): void {
+    this.root.setVisible(open);
+    this.root.setActive(open);
+    for (const child of this.root.list) {
+      if (child.input) {
+        child.input.enabled = open;
+      }
+    }
+    if (open) {
+      this.dim.setInteractive();
+    } else {
+      this.dim.disableInteractive();
+    }
   }
 
   private refreshToggles(): void {
@@ -119,8 +142,8 @@ export class PauseModal {
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
-    bg.on('pointerup', onClick);
-    text.on('pointerup', onClick);
+    bg.on('pointerdown', onClick);
+    text.on('pointerdown', onClick);
     return { parts: [bg, text], label: text };
   }
 }

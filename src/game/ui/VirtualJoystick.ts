@@ -1,10 +1,12 @@
-import { GameObjects, Input, Scene } from 'phaser';
+import { GameObjects, Input, Math as PhaserMath, Scene } from 'phaser';
+import { ignoreWorldCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
 import type { MoveInput } from '../entities/Rover';
+import { isPointerOnEnergyPanel, isPointerOnPlayHudButton } from './hudHit';
+import { bindViewResize, safeInsets, viewSize } from './viewSize';
 
 /**
- * Semi-transparent virtual stick, fixed at bottom-center.
- * Drag can start anywhere in the bottom capture band; the visual base does not move.
+ * Virtual stick that appears at the finger in the bottom capture band.
  */
 export class VirtualJoystick extends GameObjects.Container {
   private readonly base: GameObjects.Graphics;
@@ -19,15 +21,12 @@ export class VirtualJoystick extends GameObjects.Container {
   private thumbX = 0;
   private thumbY = 0;
   private activePointerId: number | null = null;
+  private captureEnabled = true;
 
   public constructor(scene: Scene) {
-    const { baseRadius, thumbRadius, marginBottom, deadzone, captureHeightRatio } =
-      GameConfig.joystick;
-    const { width, height } = GameConfig.viewport;
-    const x = width / 2;
-    const y = height - marginBottom;
-
-    super(scene, x, y);
+    const { baseRadius, thumbRadius, deadzone } = GameConfig.joystick;
+    const rest = restPosition(scene, baseRadius);
+    super(scene, rest.x, rest.y);
 
     this.baseRadius = baseRadius;
     this.thumbRadius = thumbRadius;
@@ -39,11 +38,9 @@ export class VirtualJoystick extends GameObjects.Container {
 
     this.redrawIdle();
 
-    const captureHeight = height * captureHeightRatio;
-    this.capture = scene.add.zone(width / 2, height - captureHeight / 2, width, captureHeight);
+    this.capture = scene.add.zone(0, 0, 1, 1);
     this.capture.setScrollFactor(0);
     this.capture.setDepth(1_500);
-    this.capture.setInteractive();
     this.capture.on('pointerdown', this.handlePointerDown, this);
 
     scene.input.on('pointermove', this.handlePointerMove, this);
@@ -53,6 +50,10 @@ export class VirtualJoystick extends GameObjects.Container {
     this.setScrollFactor(0);
     this.setDepth(9_000);
     scene.add.existing(this);
+    ignoreWorldCamera(scene, this);
+    ignoreWorldCamera(scene, this.capture);
+
+    bindViewResize(scene, () => this.layoutCapture());
   }
 
   /** Analog axes with length ≤ 1. Zeros when idle or inside the deadzone. */
@@ -66,6 +67,15 @@ export class VirtualJoystick extends GameObjects.Container {
     this.redrawIdle();
   }
 
+  public setCaptureEnabled(enabled: boolean): void {
+    this.captureEnabled = enabled;
+    if (enabled) {
+      this.capture.setInteractive();
+    } else {
+      this.capture.disableInteractive();
+    }
+  }
+
   public destroy(fromScene?: boolean): void {
     this.capture.off('pointerdown', this.handlePointerDown, this);
     this.capture.destroy();
@@ -73,6 +83,20 @@ export class VirtualJoystick extends GameObjects.Container {
     this.scene.input.off('pointerup', this.handlePointerUp, this);
     this.scene.input.off('pointerupoutside', this.handlePointerUp, this);
     super.destroy(fromScene);
+  }
+
+  private layoutCapture(): void {
+    const { width, height } = viewSize(this.scene);
+    const captureHeight = height * GameConfig.joystick.captureHeightRatio;
+    this.capture.setPosition(width / 2, height - captureHeight / 2);
+    this.capture.setSize(width, captureHeight);
+    if (this.captureEnabled) {
+      this.capture.setInteractive();
+    }
+    if (this.activePointerId === null) {
+      const rest = restPosition(this.scene, this.baseRadius);
+      this.setPosition(rest.x, rest.y);
+    }
   }
 
   private clearStick(): void {
@@ -84,11 +108,18 @@ export class VirtualJoystick extends GameObjects.Container {
   }
 
   private handlePointerDown(pointer: Input.Pointer): void {
-    if (this.activePointerId !== null) {
+    if (!this.captureEnabled || this.activePointerId !== null) {
+      return;
+    }
+    if (isPointerOnEnergyPanel(this.scene, pointer.x, pointer.y)) {
+      return;
+    }
+    if (isPointerOnPlayHudButton(this.scene, pointer.x, pointer.y)) {
       return;
     }
 
     this.activePointerId = pointer.id;
+    this.placeAtPointer(pointer);
     this.updateAxisFromPointer(pointer);
     this.redrawActive();
   }
@@ -109,6 +140,14 @@ export class VirtualJoystick extends GameObjects.Container {
 
     this.clearStick();
     this.redrawIdle();
+  }
+
+  private placeAtPointer(pointer: Input.Pointer): void {
+    const { width, height } = viewSize(this.scene);
+    const r = this.baseRadius;
+    const bandTop = height * (1 - GameConfig.joystick.captureHeightRatio);
+    this.x = PhaserMath.Clamp(pointer.x, r, width - r);
+    this.y = PhaserMath.Clamp(pointer.y, bandTop + r, height - r);
   }
 
   private updateAxisFromPointer(pointer: Input.Pointer): void {
@@ -169,4 +208,14 @@ export class VirtualJoystick extends GameObjects.Container {
     this.thumb.lineStyle(2, color, Math.min(1, opacity + 0.25));
     this.thumb.strokeCircle(this.thumbX, this.thumbY, this.thumbRadius);
   }
+}
+
+function restPosition(scene: Scene, baseRadius: number): { x: number; y: number } {
+  const { width, height } = viewSize(scene);
+  const { marginBottom } = GameConfig.joystick;
+  const inset = safeInsets(scene);
+  return {
+    x: width / 2,
+    y: Math.min(height - inset.bottom - marginBottom, height - inset.bottom - baseRadius),
+  };
 }

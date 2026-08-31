@@ -1,5 +1,7 @@
 import { GameObjects, Scene } from 'phaser';
+import { ignoreWorldCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
+import { bindViewResize, safeInsets, viewSize } from './viewSize';
 
 type PanelLayout = {
   width: number;
@@ -37,8 +39,6 @@ export class CleanBar {
     const hud = GameConfig.hud;
     const scale = hud.cleanPanelScale;
     const layout = (this.layout = this.buildLayout(hud, scale));
-    const x = (GameConfig.viewport.width - layout.width) / 2;
-    const y = hud.cleanPanelMarginTop;
 
     const panel = scene.add.graphics();
     this.drawPanel(panel, layout);
@@ -68,11 +68,22 @@ export class CleanBar {
       .setOrigin(1, 0)
       .setShadow(0, 1, '#000000', 1, true, true);
 
-    this.root = scene.add.container(x, y, [panel, track, this.fillGfx, title, this.percentText]);
+    this.root = scene.add.container(0, 0, [panel, track, this.fillGfx, title, this.percentText]);
     this.root.setScrollFactor(0);
     this.root.setDepth(2000);
+    ignoreWorldCamera(scene, this.root);
+    bindViewResize(scene, () => this.layoutRoot(scene));
 
     this.setRatio(0);
+  }
+
+  private layoutRoot(scene: Scene): void {
+    const hud = GameConfig.hud;
+    const inset = safeInsets(scene);
+    this.root.setPosition(
+      (viewSize(scene).width - this.layout.width) / 2,
+      inset.top + hud.cleanPanelMarginTop,
+    );
   }
 
   public setRatio(ratio: number): void {

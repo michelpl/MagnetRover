@@ -14,7 +14,7 @@ export function createGame(): Game {
     height: GameConfig.viewport.height,
     backgroundColor: GameConfig.colors.background,
     scale: {
-      mode: Scale.FIT,
+      mode: Scale.EXPAND,
       autoCenter: Scale.CENTER_BOTH,
     },
     antialias: true,

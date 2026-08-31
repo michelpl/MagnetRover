@@ -3,6 +3,8 @@ import { GameConfig } from '../config/GameConfig';
 import { Save } from '../save/Save';
 import { drawNavyPanel } from './navyPanel';
 import { setContainerInteractive } from './setContainerInteractive';
+import { ignoreWorldCamera } from '../cameras/GameCameras';
+import { viewSize } from './viewSize';
 
 const STEPS: readonly { title: string; body: string }[] = [
   {
@@ -45,7 +47,7 @@ export class TutorialOverlay {
   private done = false;
 
   public constructor(scene: Scene) {
-    const { width } = GameConfig.viewport;
+    const { width } = viewSize(scene);
     const cardX = (width - CARD_WIDTH) / 2;
     const cardY = 430;
 
@@ -91,7 +93,7 @@ export class TutorialOverlay {
     ]);
     this.root.setScrollFactor(0);
     this.root.setDepth(8_500);
-    scene.cameras.main.ignore(this.root);
+    ignoreWorldCamera(scene, this.root);
 
     this.refreshCopy();
   }

@@ -134,7 +134,7 @@ export class Rover extends GameObjects.Container {
       );
     }
 
-    this.syncHullFrame();
+    this.syncHullFrame(input);
   }
 
   /**
@@ -228,10 +228,20 @@ export class Rover extends GameObjects.Container {
   /**
    * Facing is baked into the 8-dir sheet. Counter-rotate the sprite so the
    * container can still rotate the rear magnet in world space.
+   * Frame follows the move vector; container rotation stays smoothed for the magnet.
    */
-  private syncHullFrame(): void {
+  private syncHullFrame(input?: MoveInput): void {
+    const move = input ?? this.readMoveInput();
+    let ax = move.x;
+    let ay = move.y;
+    if (ax === 0 && ay === 0) {
+      ax = this.velocityX;
+      ay = this.velocityY;
+    }
+    const facing =
+      ax !== 0 || ay !== 0 ? Math.atan2(ax, -ay) : this.rotation;
     const step = Math.PI / 4;
-    const wrapped = PhaserMath.Angle.Wrap(this.rotation);
+    const wrapped = PhaserMath.Angle.Wrap(facing);
     let index = Math.round(wrapped / step) % 8;
     if (index < 0) {
       index += 8;

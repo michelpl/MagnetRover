@@ -1,24 +1,33 @@
 import { GameObjects, Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
+import { safeInsets, viewSize } from './viewSize';
 
 /** Camera-fixed loading UI displayed while the gameplay assets are fetched. */
 export class SplashScreen {
   private readonly fill: GameObjects.Graphics;
   private readonly fillWidth: number;
+  private readonly barY: number;
+  private readonly barLeft: number;
   private progress = 0;
 
   public constructor(scene: Scene) {
-    const { width, height } = GameConfig.viewport;
+    const { width, height } = viewSize(scene);
+    const inset = safeInsets(scene);
     const config = GameConfig.splash.progressBar;
     const left = (width - config.width) / 2;
+    const barY = height - inset.bottom - (GameConfig.viewport.height - config.y);
+    this.barY = barY;
+    this.barLeft = left;
 
-    scene.add.image(width / 2, height / 2, 'splash-background');
+    const frame = scene.textures.get('splash-background').get();
+    const splash = scene.add.image(width / 2, height / 2, 'splash-background');
+    splash.setScale(Math.max(width / frame.width, height / frame.height));
 
     const shadow = scene.add.graphics();
     shadow.fillStyle(0x000814, 0.7);
     shadow.fillRoundedRect(
       left - 4,
-      config.y - (config.height + 8) / 2 + 5,
+      barY - (config.height + 8) / 2 + 5,
       config.width + 8,
       config.height + 8,
       config.radius + 4,
@@ -26,28 +35,28 @@ export class SplashScreen {
 
     const track = scene.add.graphics();
     track.fillStyle(config.trackColor, 1);
-    track.fillRoundedRect(left, config.y - config.height / 2, config.width, config.height, config.radius);
+    track.fillRoundedRect(left, barY - config.height / 2, config.width, config.height, config.radius);
     track.lineStyle(3, config.trackStrokeColor, 0.9);
-    track.strokeRoundedRect(left, config.y - config.height / 2, config.width, config.height, config.radius);
+    track.strokeRoundedRect(left, barY - config.height / 2, config.width, config.height, config.radius);
 
     this.fillWidth = config.width - config.padding * 2;
     this.fill = scene.add.graphics();
-    this.drawFill(left + config.padding, config.y, 0);
+    this.drawFill(left + config.padding, barY, 0);
 
-    this.addLabel(scene, GameConfig.splash.loadingLabel, config.y + config.labelOffsetY, 38);
-    this.addLabel(scene, GameConfig.splash.versionLabel, config.y + config.versionOffsetY, 25);
+    this.addLabel(scene, GameConfig.splash.loadingLabel, barY + config.labelOffsetY, 38);
+    this.addLabel(scene, GameConfig.splash.versionLabel, barY + config.versionOffsetY, 25);
   }
 
   public setProgress(value: number): void {
     const nextProgress = Math.min(1, Math.max(this.progress, value));
     this.progress = nextProgress;
     const config = GameConfig.splash.progressBar;
-    const left = (GameConfig.viewport.width - config.width) / 2;
-    this.drawFill(left + config.padding, config.y, nextProgress);
+    this.drawFill(this.barLeft + config.padding, this.barY, nextProgress);
   }
 
   private addLabel(scene: Scene, text: string, y: number, fontSize: number): void {
-    const label = scene.add.text(GameConfig.viewport.width / 2, y, text, {
+    const { width } = viewSize(scene);
+    const label = scene.add.text(width / 2, y, text, {
       color: `#${GameConfig.splash.progressBar.textColor.toString(16).padStart(6, '0')}`,
       fontFamily: GameConfig.ui.fontFamily,
       fontSize: `${fontSize}px`,

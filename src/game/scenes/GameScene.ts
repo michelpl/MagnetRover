@@ -123,6 +123,7 @@ export class GameScene extends Scene {
     this.settingsModal = new SettingsModal(this);
     new SettingsButton(this, true, () => this.settingsModal.show());
 
+    this.input.setTopOnly(true);
     this.joystick = new VirtualJoystick(this);
     this.pauseModal = new PauseModal(this, {
       onContinue: () => this.setPaused(false),
@@ -194,6 +195,7 @@ export class GameScene extends Scene {
     this.paused = paused;
     if (paused) {
       this.joystick.release();
+      this.joystick.setCaptureEnabled(false);
       this.rover.setJoystickInput(0, 0);
       this.tweens.pauseAll();
       this.time.paused = true;
@@ -202,6 +204,7 @@ export class GameScene extends Scene {
       this.time.paused = false;
       this.tweens.resumeAll();
       this.pauseModal.hide();
+      this.joystick.setCaptureEnabled(true);
     }
   }
 
@@ -218,10 +221,7 @@ export class GameScene extends Scene {
       return;
     }
 
-    if (
-      this.progressSystem.remainingObjects === 0 &&
-      this.progressSystem.carriedObjects === 0
-    ) {
+    if (this.progressSystem.isComplete) {
       this.endRun('Won');
       return;
     }
@@ -245,6 +245,7 @@ export class GameScene extends Scene {
 
     this.rover.setJoystickInput(0, 0);
     this.joystick.release();
+    this.joystick.setCaptureEnabled(false);
 
     const payload: ResultPayload = {
       outcome,
@@ -252,7 +253,7 @@ export class GameScene extends Scene {
       levelId: this.level.id,
       coinsEarned:
         outcome === 'Won'
-          ? this.dumpSystem.processedTotal * GameConfig.coins.perScrap
+          ? this.progressSystem.creditedScrapCount * GameConfig.coins.perScrap
           : 0,
     };
     this.registry.set('resultPayload', payload);

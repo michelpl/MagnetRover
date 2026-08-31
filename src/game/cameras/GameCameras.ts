@@ -1,5 +1,6 @@
 import { GameObjects, Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
+import { bindViewResize, viewSize } from '../ui/viewSize';
 
 export const UI_CAMERA_NAME = 'ui';
 
@@ -11,17 +12,30 @@ export function ignoreUiCamera(scene: Scene, obj: GameObjects.GameObject): void 
   }
 }
 
+/**
+ * Keep a HUD object (and interactive children) off the zoomed world camera
+ * so hit tests use unzoomed screen space.
+ */
+export function ignoreWorldCamera(scene: Scene, obj: GameObjects.GameObject): void {
+  scene.cameras.main.ignore(obj);
+  if (obj instanceof GameObjects.Container) {
+    for (const child of obj.list) {
+      ignoreWorldCamera(scene, child);
+    }
+  }
+}
+
 /** Zoomed follow cam for the map; named `ui` cam for scrollFactor-0 HUD. */
 export function bindPlayCameras(scene: Scene, follow: GameObjects.GameObject): void {
   const { lerp, zoom } = GameConfig.camera;
   const mapWidth = scene.registry.get('mapWidth') as number;
   const mapHeight = scene.registry.get('mapHeight') as number;
-  const { width, height } = GameConfig.viewport;
 
   scene.cameras.main.setZoom(zoom);
   scene.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
   scene.cameras.main.startFollow(follow, true, lerp, lerp);
 
+  const { width, height } = viewSize(scene);
   const ui = scene.cameras.add(0, 0, width, height);
   ui.setName(UI_CAMERA_NAME);
   ui.setScroll(0, 0);
@@ -31,10 +45,16 @@ export function bindPlayCameras(scene: Scene, follow: GameObjects.GameObject): v
       return;
     }
     if (child.scrollFactorX === 0 && child.scrollFactorY === 0) {
-      scene.cameras.main.ignore(child);
+      ignoreWorldCamera(scene, child);
     } else {
       ui.ignore(child);
     }
+  });
+
+  bindViewResize(scene, () => {
+    const size = viewSize(scene);
+    ui.setSize(size.width, size.height);
+    ui.setViewport(0, 0, size.width, size.height);
   });
 }
 

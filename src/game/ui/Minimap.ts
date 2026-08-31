@@ -1,5 +1,7 @@
 import { GameObjects, Scene } from 'phaser';
+import { ignoreWorldCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
+import { bindViewResize, safeInsets } from './viewSize';
 import type { EnergyPickup } from '../entities/EnergyPickup';
 import type { Processor } from '../entities/Processor';
 import type { Rover } from '../entities/Rover';
@@ -16,6 +18,7 @@ type MapRect = {
 /** Sci-fi HUD radar: full map, rover heading, floor scrap, energy pickups. */
 export class Minimap {
   private readonly markers: GameObjects.Graphics;
+  private readonly root: GameObjects.Container;
   private readonly mapWidth: number;
   private readonly mapHeight: number;
   private readonly plot: MapRect;
@@ -25,10 +28,6 @@ export class Minimap {
     const cfg = hud.minimap;
     this.mapWidth = (scene.registry.get('mapWidth') as number | undefined) ?? GameConfig.map.width;
     this.mapHeight = (scene.registry.get('mapHeight') as number | undefined) ?? GameConfig.map.height;
-
-    const cleanHeight = hud.cleanPanelHeight * hud.cleanPanelScale;
-    const x = hud.marginX;
-    const y = hud.cleanPanelMarginTop + cleanHeight + cfg.gapBelowBars;
 
     const aspect = this.mapHeight / this.mapWidth;
     const panelWidth = cfg.width;
@@ -40,9 +39,22 @@ export class Minimap {
 
     this.markers = scene.add.graphics();
 
-    const root = scene.add.container(x, y, [chrome, this.markers]);
-    root.setScrollFactor(0);
-    root.setDepth(2000);
+    this.root = scene.add.container(0, 0, [chrome, this.markers]);
+    this.root.setScrollFactor(0);
+    this.root.setDepth(2000);
+    ignoreWorldCamera(scene, this.root);
+    bindViewResize(scene, () => this.layout());
+  }
+
+  private layout(): void {
+    const hud = GameConfig.hud;
+    const cfg = hud.minimap;
+    const inset = safeInsets(this.root.scene);
+    const cleanHeight = hud.cleanPanelHeight * hud.cleanPanelScale;
+    this.root.setPosition(
+      inset.left + hud.marginX,
+      inset.top + hud.cleanPanelMarginTop + cleanHeight + cfg.gapBelowBars,
+    );
   }
 
   public updateMarkers(

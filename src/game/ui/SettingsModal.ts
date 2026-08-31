@@ -1,6 +1,7 @@
 import { GameObjects, Input, Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
 import { drawNavyPanel } from './navyPanel';
+import { bindViewResize, viewSize } from './viewSize';
 
 type VolumeSlider = {
   fill: GameObjects.Rectangle;
@@ -12,24 +13,24 @@ type VolumeSlider = {
 /** Overlay with visual-only, draggable music and sound-effect volume controls. */
 export class SettingsModal {
   private readonly root: GameObjects.Container;
+  private readonly dim: GameObjects.Rectangle;
   private readonly sliders: VolumeSlider[] = [];
   private activeSlider: VolumeSlider | null = null;
   private readonly sliderLeft: number;
   private readonly sliderWidth: number;
 
   public constructor(scene: Scene) {
-    const { width, height } = GameConfig.viewport;
+    const { width, height } = viewSize(scene);
     const settings = GameConfig.settings;
     const panelX = (width - settings.panelWidth) / 2;
     const panelY = (height - settings.panelHeight) / 2;
     this.sliderLeft = panelX + (settings.panelWidth - settings.sliderWidth) / 2;
     this.sliderWidth = settings.sliderWidth;
 
-    const dim = scene.add
+    this.dim = scene.add
       .rectangle(0, 0, width, height, 0x020817, 0.78)
-      .setOrigin(0, 0)
-      .setInteractive();
-    dim.on('pointerup', () => this.hide());
+      .setOrigin(0, 0);
+    this.dim.on('pointerup', () => this.hide());
 
     const panel = scene.add.graphics();
     drawNavyPanel(panel, settings.panelWidth, settings.panelHeight, settings.panelRadius);
@@ -64,7 +65,7 @@ export class SettingsModal {
     this.sliders.push(sfx, music);
 
     this.root = scene.add.container(0, 0, [
-      dim,
+      this.dim,
       panel,
       title,
       closeBackground,
@@ -74,7 +75,12 @@ export class SettingsModal {
     ]);
     this.root.setScrollFactor(0);
     this.root.setDepth(20_000);
-    this.root.setVisible(false);
+    this.setOpen(false);
+
+    bindViewResize(scene, () => {
+      const size = viewSize(scene);
+      this.dim.setSize(size.width, size.height);
+    });
 
     scene.input.on('pointermove', this.onPointerMove, this);
     scene.input.on('pointerup', this.onPointerUp, this);
@@ -89,12 +95,27 @@ export class SettingsModal {
   }
 
   public show(): void {
-    this.root.setVisible(true);
+    this.setOpen(true);
   }
 
   public hide(): void {
     this.activeSlider = null;
-    this.root.setVisible(false);
+    this.setOpen(false);
+  }
+
+  private setOpen(open: boolean): void {
+    this.root.setVisible(open);
+    this.root.setActive(open);
+    for (const child of this.root.list) {
+      if (child.input) {
+        child.input.enabled = open;
+      }
+    }
+    if (open) {
+      this.dim.setInteractive();
+    } else {
+      this.dim.disableInteractive();
+    }
   }
 
   private createSlider(scene: Scene, label: string, y: number): VolumeSlider {
