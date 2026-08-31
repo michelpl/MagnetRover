@@ -1,29 +1,22 @@
-import type { LevelConfig } from './LevelConfig';
-import { generateLevel } from '../levels/generateLevel';
-import { STAGE_RECIPES } from '../levels/recipes';
+import { getMaxStageId, getNextStageId, getStageById, isStageUnlocked, STAGES } from './Stages';
 
-export const levels: readonly LevelConfig[] = STAGE_RECIPES.map(generateLevel);
+/** Stage list for carousel — delegates to survival StageConfig. */
+export const levels = STAGES.map((stage) => ({ id: stage.id, name: stage.name }));
 
-export function getLevelById(id: number): LevelConfig {
-  const level = levels.find((entry) => entry.id === id);
-  if (!level) {
-    throw new Error(`Unknown level id: ${id}`);
-  }
-  return level;
+export function getLevelById(id: number) {
+  return getStageById(id);
 }
 
 export function getNextLevelId(currentId: number): number {
-  const index = levels.findIndex((entry) => entry.id === currentId);
-  if (index < 0 || index >= levels.length - 1) {
-    return levels[levels.length - 1]?.id ?? currentId;
-  }
-  return levels[index + 1].id;
+  return getNextStageId(currentId);
 }
 
 export function getMaxLevelId(): number {
-  return levels[levels.length - 1]?.id ?? 1;
+  return getMaxStageId();
 }
 
 export function isLevelUnlocked(levelId: number, currentLevel: number): boolean {
-  return levelId <= currentLevel;
+  return isStageUnlocked(levelId, currentLevel);
 }
+
+export { getStageById, STAGES };

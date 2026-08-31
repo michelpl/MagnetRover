@@ -1,12 +1,14 @@
-MVP — Magnet Rover
+MVP — Magnet Rover (Survival)
 
 1. Objetivo do jogo
 
-Criar um jogo mobile hiper casual, top-down, simples e satisfatório, no qual o jogador controla um pequeno veículo equipado com um sistema magnético traseiro.
+Criar um jogo mobile top-down de sobrevivência, simples e satisfatório, no qual o jogador controla um pequeno veículo (Rover) equipado com até quatro armas.
 
-O objetivo de cada fase é explorar o mapa, coletar todos os objetos metálicos espalhados, descarregar a carga em uma processadora e limpar 100% da fase antes que a energia do veículo acabe.
+O objetivo de cada stage é sobreviver a uma onda de inimigos hostis, eliminando todos antes que o HP do Rover chegue a zero.
 
-O mapa deve ser maior do que a área visível da tela para gerar sensação de exploração e descoberta.
+O mapa deve ser maior do que a área visível da tela para permitir reposicionamento durante o combate.
+
+Diferencial do loop: loadout de armas escolhido antes da partida + upgrades permanentes entre runs.
 
 2. Stack sugerida
 
@@ -38,9 +40,9 @@ Android APK / AAB
 
 O MVP deve priorizar:
 
-Controle simples.
+Controle simples (uma mão).
 
-Feedback visual satisfatório.
+Feedback visual satisfatório no combate.
 
 Poucas regras.
 
@@ -50,19 +52,15 @@ Implementação simples.
 
 Boa performance em celulares modestos.
 
-Fácil criação de novas fases.
+Fácil criação de novos stages via dados.
 
 Progressão simples baseada em moedas e upgrades.
 
 Não incluir inicialmente:
 
-inimigos;
+ímã traseiro / coleta / processadora / energia;
 
-combate;
-
-física complexa;
-
-pathfinding;
+pathfinding complexo;
 
 multiplayer;
 
@@ -70,83 +68,62 @@ multiplayer;
 
 crafting;
 
-inventário;
-
 missões;
 
-energia regenerativa;
+regeneração passiva de HP;
 
-vários tipos de processadoras.
+vários tipos de inimigo com comportamentos distintos;
+
+pausa forçada entre rajadas de spawn.
 
 4. Loop principal
 
-Iniciar fase
+Iniciar stage
     ↓
-Explorar mapa
+Rover spawna no centro do mapa
     ↓
-Encontrar objetos
+Armas equipadas disparam automaticamente
     ↓
-Atrair cubos metálicos com o ímã traseiro
+Onda de inimigos (rajadas + respiros)
     ↓
-Carga do veículo aumenta (fila maleável)
+Combate: HP do Rover vs HP dos inimigos
     ↓
-Capacidade máxima atingida
+┌────────────────────┬────────────────────┐
+│ Todos eliminados   │ HP do Rover = 0    │
+│ Vitória + moedas   │ Derrota + retry    │
+└────────────────────┴────────────────────┘
     ↓
-Ir até a processadora
+Garage: upgrades permanentes
     ↓
-Descarregar objetos
+Inventário: ajustar loadout (até 4 armas)
     ↓
-Continuar explorando
-    ↓
-Limpar 100% do mapa
-    ↓
-Vitória
-
-Condição alternativa:
-
-Energia chega a 0
-    ↓
-Ainda existem objetos no mapa
-    ↓
-Derrota
+Próximo stage
 
 5. Condições de vitória e derrota
 
 Vitória
 
-O jogador vence quando todos os objetos coletáveis da fase forem removidos do mapa.
+O jogador vence quando não restam inimigos vivos nem spawns pendentes na onda do stage.
 
 Regra:
 
-remainingObjects == 0
-
-A fase pode terminar imediatamente após o último objeto ser coletado ou após a última carga ser descarregada.
-
-Para o MVP, recomenda-se considerar a fase concluída somente quando:
-
-remainingObjects == 0
+remainingEnemies === 0
 AND
-carriedObjects == 0
-
-Assim, o jogador precisa levar a última carga até a processadora.
+waveFullySpawned === true
 
 Derrota
 
 O jogador perde quando:
 
-energy <= 0
-AND
-fase ainda não foi concluída
+roverHp <= 0
 
-A energia não se regenera naturalmente.
-
-Power-ups de energia poderão existir em algumas fases.
+Não existe energia, percentual de limpeza nem carga.
 
 6. Veículo do jogador
 
 Nome provisório:
 
-Magnet Rover
+Magnet Rover (working title interno: Rover Survival — ver decisões em aberto §33)
 
 O veículo deve ser:
 
@@ -156,24 +133,22 @@ visualmente simples;
 
 fácil de identificar em câmera top-down;
 
-equipado com um ímã claramente visível na parte de trás;
-
-capaz de puxar e arrastar visualmente uma fila crescente de cubos metálicos.
+capaz de carregar armas visíveis (placeholder aceitável).
 
 Movimento
 
 Controle recomendado:
 
-joystick virtual  transparente na parte inferior central tela;
+joystick virtual transparente na parte inferior central da tela;
 
 movimento baseado no arraste do dedo.
 
 Exemplo:
 
-dedo para cima    → veículo sobe
-dedo para baixo   → veículo desce
-dedo para esquerda → veículo vira/move para esquerda
-dedo para direita  → veículo vira/move para direita
+dedo para cima     → veículo sobe
+dedo para baixo    → veículo desce
+dedo para esquerda → veículo move para esquerda
+dedo para direita  → veículo move para direita
 
 O veículo deve seguir o input com suavização.
 
@@ -181,222 +156,122 @@ Não utilizar aceleração ou direção realista no MVP.
 
 O controle deve parecer arcade.
 
-7. Sistema magnético
+HP
 
-O ímã fica na parte de trás do Rover.
+O Rover possui maxHp e hp.
 
-O veículo possui um raio magnético medido a partir dessa posição traseira.
+hp começa em maxHp no início de cada partida.
 
-Todo cubo metálico dentro desse raio começa a ser atraído.
+Dano reduz hp; hp não regenera naturalmente no MVP.
 
-Fluxo:
+Stats upgradeáveis (proposta inicial):
 
-Cubo entra no raio
-    ↓
-Cubo muda para estado ATTRACTED
-    ↓
-Move-se em direção ao ímã (traseira do Rover)
-    ↓
-Chega próximo ao ímã / fim da fila
-    ↓
-Estado CARRIED
+HP máximo
 
-Estados do objeto
+Velocidade
 
-enum ScrapState {
-  Idle,
-  Attracted,
-  Carried,
-  Processing
+Armadura (redução de dano %)
+
+Sem ímã, sem capacidade de carga, sem raio magnético.
+
+7. Sistema de armas
+
+O jogador possui uma coleção de armas desbloqueadas ao longo do jogo.
+
+Antes de cada partida, escolhe até 4 armas no inventário.
+
+Armas disparam automaticamente respeitando cooldown (padrão survivor-like — reduz complexidade no mobile).
+
+Cada arma define:
+
+id
+
+name
+
+damage
+
+fireRate (ms entre disparos)
+
+range
+
+projectileSpeed (se aplicável)
+
+upgradeTier (nível comprado na Garage)
+
+Armas placeholder (provisório)
+
+| Arma         | Comportamento sugerido                          |
+| ------------ | ----------------------------------------------- |
+| Pulse Cannon | Projétil reto, curto alcance, alto DPS          |
+| Arc Turret   | Disparo em cone à frente do rover               |
+| Orbit Drone  | Projétil que orbita o rover                     |
+| Mine Layer   | Deixa minas ao se mover (cooldown)              |
+
+Upgrades de arma (na Garage):
+
+dano por tier;
+
+cadência (fireRate) por tier;
+
+alcance por tier.
+
+Regra: no máximo 4 armas ativas simultaneamente por partida.
+
+8. Inimigos
+
+Placeholder visual: rover hostil (reutilizar sprite do jogador com tint diferente).
+
+Comportamento MVP:
+
+perseguir o jogador com movimento arcade interpolado;
+
+sem pathfinding A*.
+
+Stats por stage / receita:
+
+hp
+
+speed
+
+contactDamage (proposta MVP: só dano por contato; ranged pós-MVP)
+
+Ao morrer:
+
+remover da lista de inimigos vivos;
+
+feedback visual (flash, partículas, som);
+
+contribuir para remainingEnemies e contagem de moedas ao fim da partida.
+
+9. Ondas (wave model)
+
+Cada stage possui uma onda estruturada em rajadas com respiros.
+
+Exemplo de configuração:
+
+WaveConfig {
+  bursts: [
+    { count: 5,  intervalMs: 800,  delayAfterMs: 3000 },
+    { count: 8,  intervalMs: 600,  delayAfterMs: 2500 },
+    { count: 12, intervalMs: 500,  delayAfterMs: 0 }
+  ]
 }
 
-Regra básica
+Durante o respiro (delayAfterMs):
 
-if (distance(scrap, magnetAnchor) <= magnetRadius) {
-    scrap.state = ScrapState.Attracted;
-}
+não spawna novos inimigos;
 
-O cubo pode se aproximar usando interpolação simples:
+inimigos vivos continuam perseguindo e causando dano;
 
-scrap.x += (targetX - scrap.x) * attractionSpeed;
-scrap.y += (targetY - scrap.y) * attractionSpeed;
+o jogador pode reposicionar;
 
-target deve ser o ímã traseiro (ou a ponta da fila, se já houver carga).
+a partida não pausa (sem modal, sem freeze de input).
 
-Não é necessário utilizar física real.
+Vitória só quando toda a onda foi spawnada e todos os inimigos foram eliminados.
 
-8. Visual da carga — fila maleável
+10. Mapa e stages
 
-Os cubos coletados não devem desaparecer imediatamente.
-
-Eles formam uma fila maleável atrás do Rover, ancorada no ímã traseiro.
-
-Objetivo:
-
-mostrar visualmente o crescimento da carga;
-
-gerar sensação satisfatória de "comboio" metálico;
-
-permitir ao jogador perceber que está ficando cheio sem depender somente da UI.
-
-Implementação sugerida
-
-Manter a carga como uma lista ordenada:
-
-cargo: Scrap[]
-
-O primeiro cubo carregado segue o ímã.
-
-Cada cubo seguinte segue o anterior.
-
-Usar interpolação / follow suave para a fila se curvar com o movimento do Rover (snake / train feel).
-
-A fila deve parecer maleável: curvas suaves, sem trava rígida em slots fixos ao redor do veículo.
-
-Não usar cargoSlots em posições predefinidas ao redor do Rover no MVP.
-
-Exemplo:
-
-[ROVER] 🧲 — ■ — ■ — ■ — ■
-
-Cubos de cores e tamanhos diferentes na mesma fila.
-
-Quando a capacidade aumenta via upgrade, a fila pode ficar mais longa.
-
-9. Capacidade
-
-O Magnet Rover possui limite máximo de carga.
-
-Exemplo inicial:
-
-capacity = 20 objetos
-
-Quando estiver cheio:
-
-carriedObjects >= capacity
-
-o veículo deixa de coletar novos objetos.
-
-Os objetos continuam no mapa.
-
-Feedback necessário:
-
-pequeno efeito visual;
-
-som curto;
-
-mensagem opcional "FULL";
-
-indicação da processadora.
-
-Não bloquear o movimento do jogador.
-
-10. Processadora
-
-Cada fase possui inicialmente uma única processadora.
-
-Ela deve ser claramente visível e diferente do restante do cenário.
-
-Quando o veículo carregado entra na área da processadora:
-
-Processadora detecta Rover
-    ↓
-Objetos começam a ser puxados
-    ↓
-Objetos saem do Rover
-    ↓
-Objetos entram na máquina
-    ↓
-Moedas são adicionadas
-
-Descarga
-
-A descarga deve ser rápida e satisfatória.
-
-Evitar remover todos os objetos instantaneamente.
-
-Usar sequência:
-
-objeto 1 → máquina
-objeto 2 → máquina
-objeto 3 → máquina
-...
-
-Intervalo sugerido:
-
-20–60 ms
-
-por objeto.
-
-Adicionar:
-
-tween;
-
-escala;
-
-rotação;
-
-partículas;
-
-som;
-
-vibração leve;
-
-contador de moedas.
-
-11. Energia
-
-A energia representa o limite principal da fase.
-
-Começa em:
-
-100%
-
-e diminui durante a movimentação.
-
-Para o MVP:
-
-energy -= movementEnergyCost * delta;
-
-Evitar regras adicionais.
-
-Não consumir energia por:
-
-coletar;
-
-descarregar;
-
-ficar parado.
-
-Consumir energia somente quando o veículo estiver se movimentando.
-
-Isso torna a regra fácil de entender:
-
-Quanto mais você roda pelo mapa, mais energia gasta.
-
-12. Power-up de energia
-
-Algumas fases podem conter baterias.
-
-Exemplo:
-
-🔋
-
-Ao coletar:
-
-energy = Math.min(maxEnergy, energy + energyBonus);
-
-Valores possíveis:
-
-+10%
-+20%
-+25%
-
-No MVP, utilizar apenas um tipo.
-
-Power-ups devem ser opcionais na construção das fases.
-
-13. Exploração do mapa
+Todos os stages utilizam o mesmo mapa (mesma textura de fundo, mesmas dimensões).
 
 O mapa deve ser maior do que a viewport.
 
@@ -406,186 +281,159 @@ Viewport:
 1080 × 1920
 
 Mapa:
-2500 × 4000
+1672 × 941 (workshop — scenario1)
 
-A câmera segue o Rover.
+A câmera segue o Rover com lerp e respeita os limites do mapa.
 
-camera.startFollow(rover);
+Dificuldade entre stages vem da receita de onda (contagem, HP, velocidade dos inimigos) e obstáculos opcionais — não de mapas diferentes.
 
-O jogador não deve visualizar toda a fase de uma vez.
+11. Dados do stage
 
-Isso cria:
-
-descoberta;
-
-curiosidade;
-
-exploração;
-
-sensação de progresso.
-
-14. Estrutura visual de uma fase
-
-Uma fase pode conter diferentes regiões.
+As fases devem ser configuráveis sem alterar código de gameplay.
 
 Exemplo:
 
-┌──────────────────────────────┐
-│ Oficina                      │
-│ ■ ■ ■                        │
-│                              │
-│      corredor                │
-│                              │
-│ Ferro-velho                  │
-│ ■ ■ ■ 🚙                     │
-│                              │
-│            🔋                │
-│                              │
-│              PROCESSADORA    │
-└──────────────────────────────┘
+interface StageConfig {
+    id: number;
+    displayName: string;
 
-Cubos metálicos de cores e tamanhos diferentes espalhados pelas regiões.
+    mapWidth: number;
+    mapHeight: number;
 
-Evitar mapas labirínticos no MVP.
+    spawn: {
+        x: number;
+        y: number;
+    };
 
-O jogador deve conseguir navegar intuitivamente.
+    wave: WaveConfig;
 
-15. Objetos coletáveis
+    enemyRecipe: {
+        type: string;
+        hp: number;
+        speed: number;
+        contactDamage: number;
+    };
 
-No MVP, os itens coletáveis são cubos metálicos.
+    obstacles?: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    }[];
+}
 
-Variações permitidas:
+Isso permitirá criar receitas por stage e escalar dificuldade sem novos assets de mapa.
 
-cores diferentes;
+12. Moedas
 
-tamanhos diferentes.
+O jogador ganha moedas ao eliminar inimigos e ao vencer stages.
 
-Todos os cubos possuem o mesmo comportamento de gameplay.
+Proposta MVP:
 
-Diferenças de cor e tamanho são apenas visuais.
+1 moeda por inimigo eliminado (creditada ao fim da partida);
 
-Não criar peso, raridade ou valor diferente no MVP.
+bônus fixo por vitória de stage;
 
-Todos contam como:
+bônus extra opcional na primeira vitória de cada stage.
 
-1 objeto
+Moedas persistem entre partidas.
 
-Isso reduz bastante a complexidade.
+playerCoins += enemiesKilled + stageBonus;
 
-16. Moedas
+13. Upgrades
 
-O jogador ganha moedas ao processar objetos.
+Garage (evolução da tela de upgrades atual):
 
-Exemplo:
+Upgrades de rover
 
-1 objeto processado = 1 moeda
+| Linha    | Exemplo de tiers        |
+| -------- | ----------------------- |
+| HP máx.  | 100 → 120 → 145 → 175   |
+| Velocidade | 160 → 180 → 200 → 220 |
+| Armadura | 0% → 10% → 20% → 30%    |
 
-Moedas persistem entre fases.
+Upgrades de arma (por id de arma)
 
-playerCoins += processedObjects;
-
-No futuro podem existir multiplicadores, mas não no MVP.
-
-17. Upgrades
-
-Inicialmente utilizar somente três upgrades.
-
-Capacidade
-
-Aumenta quantos objetos podem ser carregados.
-
-Exemplo:
-
-20 → 25 → 30 → 40
-
-Raio magnético
-
-Aumenta a distância de atração.
-
-100px → 120px → 145px → 175px
-
-Velocidade
-
-Aumenta a velocidade do Rover.
-
-200 → 215 → 230 → 250
+| Atributo  | Exemplo de tiers por arma |
+| --------- | ------------------------- |
+| Dano      | 10 → 14 → 19 → 25         |
+| Cadência  | 500ms → 420ms → 350ms     |
+| Alcance   | 200 → 240 → 290 px        |
 
 Regra
 
 Cada upgrade custa moedas.
 
-Exemplo:
+Exemplo de custos por tier:
 
-Level 1 → 100 moedas
-Level 2 → 250 moedas
-Level 3 → 500 moedas
+Level 1 → 12 moedas
+Level 2 → 30 moedas
+Level 3 → 70 moedas
 
-18. Progressão
+Removido do design: capacity, battery, magnet radius.
+
+14. Progressão
 
 Fluxo:
 
-Fase
+Stage
  ↓
-Vitória
+Vitória ou derrota
  ↓
-Recompensa
+Recompensa (moedas)
  ↓
-Tela de upgrades
+Garage (upgrades) / Inventário (loadout)
  ↓
-Próxima fase
+Próximo stage
 
-No MVP não é necessário implementar mapa de fases.
+Lista linear de stages (Level 1, Level 2, …) sem mapa de mundo.
 
-Pode existir apenas:
-
-Level 1
-Level 2
-Level 3
-...
-
-19. Interface durante a fase
+15. Interface durante a fase
 
 Manter a UI mínima.
 
 Topo
 
-ENERGIA
+HP
 ████████░░ 80%
 
-Segundo indicador
+Indicador de onda
 
-LIMPEZA
-██████░░░░ 60%
+12 enemies left
 
-ou:
+ou barra de progresso da onda (spawnados / eliminados).
 
-Restantes: 38
+Joystick
 
-Preferência:
+Parte inferior central — transparente, uma mão.
 
-barra de limpeza percentual, pois reforça a mecânica principal.
+Minimap (opcional)
 
-Carga
+Mostrar posição do rover, inimigos e obstáculos.
 
-Pode existir uma pequena indicação:
+Removido do HUD: energia, limpeza, carga.
 
-12 / 20
+16. Inventário (nova tela)
 
-Mas o principal feedback deve ser visual através da fila de cubos atrás do Rover.
+Tela dedicada ao que o jogador possui e ao que levará para a partida.
 
-20. Cálculo de limpeza
+Funcionalidades:
 
-cleanPercentage =
-    ((totalObjects - remainingObjects) / totalObjects) * 100;
+listar armas desbloqueadas (ownedWeapons);
 
-Exemplo:
+equipar até 4 armas em slots de loadout;
 
-Total: 100
-Restantes: 35
+salvar loadout no save local;
 
-Limpeza: 65%
+acessível pelo HubBar (aba Inventory).
 
-21. Câmera
+Fluxo sugerido:
+
+Menu (Stages) → Inventory (confirmar loadout) → Game
+
+ou Play direto com último loadout salvo.
+
+17. Câmera
 
 A câmera deve:
 
@@ -599,67 +447,39 @@ Exemplo:
 
 camera.startFollow(rover, true, 0.08, 0.08);
 
-Pode existir um pequeno look-ahead na direção do movimento futuramente.
+Look-ahead na direção do movimento: pós-MVP.
 
-Não necessário no MVP.
+18. Feedback satisfatório
 
-22. Feedback satisfatório
+Ao acertar inimigo
 
-Essa é uma das partes mais importantes do jogo.
+flash no inimigo;
 
-Ao atrair
+número de dano opcional (pequeno);
 
-Adicionar:
+som curto de impacto.
 
-pequena rotação do cubo;
-
-aceleração em direção ao ímã traseiro;
-
-brilho opcional;
-
-som metálico curto.
-
-Ao entrar na fila
-
-Adicionar:
-
-pequeno bounce;
-
-encaixe suave no fim da fila;
-
-som "click";
-
-pequena vibração.
-
-Ao descarregar
-
-Adicionar:
-
-sucção rápida;
-
-múltiplos sons;
+Ao eliminar inimigo
 
 partículas;
 
-moedas surgindo;
-
-números aumentando;
+som de destruição;
 
 leve screen shake.
 
-Ao limpar uma região
+Ao receber dano
 
-Adicionar pequenos efeitos como:
+flash vermelho no rover;
 
-partículas de poeira;
+i-frames curtos (proposta: 300 ms);
 
-brilho;
+vibração leve.
 
-"Clean!";
+Entre rajadas (respiro)
 
-som positivo.
+sem pausa; opcional: indicador visual sutil de “breather” na UI.
 
-23. Arquitetura sugerida
+19. Arquitetura sugerida
 
 src/
 │
@@ -671,106 +491,86 @@ src/
 │   ├── scenes/
 │   │   ├── BootScene.ts
 │   │   ├── MenuScene.ts
+│   │   ├── InventoryScene.ts
+│   │   ├── GarageScene.ts
 │   │   ├── GameScene.ts
-│   │   ├── UpgradeScene.ts
 │   │   └── ResultScene.ts
 │   │
 │   ├── entities/
 │   │   ├── Rover.ts
-│   │   ├── Scrap.ts
-│   │   ├── Processor.ts
-│   │   └── EnergyPickup.ts
+│   │   ├── Enemy.ts
+│   │   └── Projectile.ts
 │   │
 │   ├── systems/
-│   │   ├── MagnetSystem.ts
-│   │   ├── CargoSystem.ts
-│   │   ├── EnergySystem.ts
-│   │   └── ProgressSystem.ts
+│   │   ├── WeaponSystem.ts
+│   │   ├── WaveSpawnSystem.ts
+│   │   ├── CombatSystem.ts
+│   │   ├── HpSystem.ts
+│   │   └── RunState.ts
 │   │
 │   ├── config/
 │   │   ├── GameConfig.ts
-│   │   └── Levels.ts
+│   │   ├── StageConfig.ts
+│   │   ├── Weapons.ts
+│   │   └── Stages.ts
+│   │
+│   ├── save/
+│   │   ├── Save.ts
+│   │   └── Upgrades.ts
 │   │
 │   └── ui/
-│       ├── EnergyBar.ts
-│       ├── CleanBar.ts
-│       └── CargoIndicator.ts
+│       ├── HpBar.ts
+│       ├── WaveIndicator.ts
+│       ├── VirtualJoystick.ts
+│       └── InventoryUI.ts
 │
 └── assets/
     ├── sprites/
     ├── audio/
     └── maps/
 
-24. Entidades principais
+Deprecado (remover do design e do código legado):
+
+Scrap, Processor, EnergyPickup
+
+MagnetSystem, CargoSystem, DumpSystem, EnergySystem
+
+ProgressSystem (limpeza), RegionClearSystem
+
+EnergyBar, CleanBar, CargoIndicator
+
+ShopScene (fundida em Inventory + Garage)
+
+20. Entidades principais
 
 Rover
 
 class Rover {
     speed: number;
-    magnetRadius: number;
-    capacity: number;
-    energy: number;
-    cargo: Scrap[];
-    // ímã ancorado na traseira do veículo
+    maxHp: number;
+    hp: number;
+    armor: number;
 }
 
-Scrap
+Enemy
 
-class Scrap {
-    state: ScrapState;
-    color: number;
-    size: number;
-    sprite: Phaser.GameObjects.Sprite;
+class Enemy {
+    hp: number;
+    maxHp: number;
+    speed: number;
+    contactDamage: number;
+    type: string;
 }
 
-Processor
+Projectile (quando a arma usar projétil)
 
-class Processor {
-    processingArea: Phaser.Geom.Rectangle;
+class Projectile {
+    damage: number;
+    speed: number;
+    ownerWeaponId: string;
 }
 
-EnergyPickup
-
-class EnergyPickup {
-    energyAmount: number;
-}
-
-25. Dados da fase
-
-As fases devem ser configuráveis sem alterar código.
-
-Exemplo:
-
-interface LevelConfig {
-    id: number;
-
-    mapWidth: number;
-    mapHeight: number;
-
-    initialEnergy: number;
-
-    processor: {
-        x: number;
-        y: number;
-    };
-
-    scraps: {
-        x: number;
-        y: number;
-        color: string;
-        size: 'small' | 'medium' | 'large';
-    }[];
-
-    powerUps?: {
-        x: number;
-        y: number;
-        type: 'energy';
-    }[];
-}
-
-Isso permitirá posteriormente criar um editor ou gerar fases automaticamente.
-
-26. Save local
+21. Save local
 
 Utilizar inicialmente:
 
@@ -781,20 +581,30 @@ Salvar:
 {
     coins: number,
     currentLevel: number,
-    upgrades: {
-        capacity: number,
-        magnetRadius: number,
-        speed: number
-    }
+    ownedWeapons: string[],
+    loadout: [string | null, string | null, string | null, string | null],
+    weaponUpgrades: Record<string, number>,
+    roverUpgrades: {
+        hp: number,
+        speed: number,
+        armor: number
+    },
+    tutorialDone: boolean,
+    sfxMuted: boolean,
+    hapticsEnabled: boolean
 }
 
 Ao migrar para Android com Capacitor, esse sistema pode permanecer inicialmente.
 
-27. Fluxo de telas
+22. Fluxo de telas
 
 BOOT
  ↓
-MENU
+MENU (Stages)
+ ↓
+┌─────────────┬──────────────┬─────────────┐
+│  Inventory  │    Garage    │    PLAY     │
+└─────────────┴──────────────┴─────────────┘
  ↓
 GAME
  ↓
@@ -806,44 +616,29 @@ Vitória       Derrota
 RESULT         RETRY
 │
 ↓
-UPGRADES
-│
-↓
-NEXT LEVEL
+Garage / Inventory / Next stage
 
-28. Primeira fase do protótipo
+HubBar: abas Stages | Inventory | Garage.
 
-Criar apenas uma fase para validar a mecânica.
+23. Primeiro stage do protótipo
 
-Configuração
+Criar apenas um stage para validar a mecânica de combate.
 
-Mapa:
+Configuração sugerida
 
-2000 × 3000
+Mapa: workshop (1672 × 941)
 
-Objetos:
+Spawn: centro do mapa
 
-100
+Onda: 1 rajada pequena (ex.: 8 inimigos, intervalo 800 ms)
 
-Capacidade:
+Inimigo: hp baixo, speed moderada, só dano por contato
 
-20
+Armas: 1–2 desbloqueadas no início
 
-Energia:
+Loadout: até 4 slots (preencher só o que estiver desbloqueado)
 
-100
-
-Processadora:
-
-1
-
-Power-ups:
-
-0
-
-Upgrades:
-
-desativados inicialmente.
+Upgrades: desativados até o loop base estar divertido
 
 Objetivo
 
@@ -853,131 +648,101 @@ movimentação;
 
 câmera;
 
-sensação magnética;
+HP e dano;
 
-fila maleável de cubos;
+uma arma com auto-fire;
 
-descarga;
+inimigo perseguindo o jogador;
 
-limpeza;
+onda com respiro;
 
-consumo de energia;
+vitória e derrota;
 
-vitória;
+sensação arcade em mobile.
 
-derrota.
+24. Segunda etapa
 
-29. Segunda etapa
-
-Depois que o gameplay básico estiver satisfatório:
+Depois que o combate básico estiver satisfatório:
 
 Adicionar:
 
-moedas;
+moedas e persistência;
 
-tela de upgrades;
+tela de inventário com loadout;
 
-diferentes mapas;
+Garage com upgrades de rover e armas;
 
-power-up de energia;
+4 armas placeholder;
 
-mais cores e tamanhos de cubos metálicos;
+5 stages com receitas de onda escalonadas;
 
-efeitos sonoros;
-
-partículas;
+efeitos sonoros e partículas;
 
 vibração;
 
-tutorial;
+tutorial reescrito;
 
 build Android.
 
-30. Ordem recomendada de implementação
+25. Ordem recomendada de implementação
 
-Fase 1 — Core
+Fase 1 — Documentação
 
-Criar projeto Phaser + TypeScript + Vite
+Alinhar MVP, ROADMAP, AGENTS e regras Cursor.
 
-Criar mapa maior que a viewport
+Fase 2 — Remover legado
 
-Criar Rover
+Remover sistemas de ímã, carga, processadora, energia e limpeza.
 
-Implementar controle touch
+Fase 3 — Core combat
 
-Implementar câmera
+HP do rover;
 
-Criar cubos metálicos coletáveis (cores e tamanhos)
+inimigo placeholder;
 
-Implementar raio magnético no ímã traseiro
+dano por contato;
 
-Implementar atração
+vitória / derrota.
 
-Implementar fila maleável de carga
+Fase 4 — Armas
 
-Fase 2 — Game Loop
+WeaponSystem com auto-fire;
 
-Criar processadora
+pelo menos uma arma;
 
-Implementar descarga
+Projectile se necessário.
 
-Implementar energia
+Fase 5 — Ondas
 
-Implementar barra de energia
+WaveSpawnSystem com rajadas e respiros;
 
-Implementar percentual de limpeza
+WaveIndicator no HUD.
 
-Implementar vitória
+Fase 6 — Meta
 
-Implementar derrota
+InventoryScene e loadout no save;
 
-Implementar retry
+Garage repurpose;
 
-Fase 3 — Game Feel
+moedas.
 
-Tweens
+Fase 7 — Conteúdo
 
-Partículas
+4 armas placeholder;
 
-Sons
+5 stages;
 
-Vibração
+tutorial;
 
-Screen shake
+feel (VFX, SFX, haptics).
 
-Feedback de carga cheia
+Fase 8 — Mobile
 
-Feedback de limpeza
+Capacitor / Android;
 
-Fase 4 — Progressão
+performance em dispositivos modestos.
 
-Moedas
-
-Persistência
-
-Upgrade de capacidade
-
-Upgrade de raio
-
-Upgrade de velocidade
-
-Tela de upgrades
-
-Fase 5 — Mobile
-
-Adicionar Capacitor
-
-Criar projeto Android
-
-Testar diferentes resoluções
-
-Testar performance
-
-Gerar APK
-
-Gerar AAB
-
-31. Critérios para considerar o MVP pronto
+26. Critérios para considerar o MVP pronto
 
 O MVP está pronto quando:
 
@@ -987,56 +752,139 @@ o mapa é maior do que a tela;
 
 a câmera acompanha o jogador;
 
-cubos metálicos são atraídos ao chegar perto do ímã traseiro;
+o Rover tem HP visível no HUD;
 
-cubos ficam visualmente em uma fila maleável atrás do Rover;
+inimigos perseguem o jogador;
 
-existe limite de carga;
+pelo menos uma arma dispara automaticamente;
 
-o jogador consegue descarregar na processadora;
+até 4 armas podem equipar no loadout;
 
-objetos processados desaparecem permanentemente;
+a onda spawna em rajadas com respiros sem pausar a partida;
 
-a energia diminui durante a movimentação;
+eliminar todos os inimigos causa vitória;
 
-energia zero causa derrota;
+HP zero causa derrota;
 
-limpar e processar todos os objetos causa vitória;
+moedas são concedidas e persistem;
 
-moedas são concedidas;
+upgrades de rover e armas funcionam na Garage;
 
-upgrades básicos funcionam;
+o inventário salva o loadout entre sessões;
 
-progresso é salvo;
+5 stages jogáveis no mesmo mapa com dificuldade crescente;
 
 o jogo roda suavemente em Android;
 
-uma fase completa pode ser jogada do início ao fim sem bugs bloqueantes.
+uma partida completa pode ser jogada do início ao fim sem bugs bloqueantes.
 
-32. Objetivo do protótipo
+27. Objetivo do protótipo
 
 Antes de produzir conteúdo, o protótipo deve responder apenas a esta pergunta:
 
-É divertido e satisfatório dirigir pelo mapa, puxar muitos cubos metálicos com o ímã traseiro, ver a fila maleável crescer atrás do Rover e descarregar tudo na processadora?
+É divertido e satisfatório dirigir o Rover, esquivar inimigos, ver as armas dispararem sozinhas e sobreviver até o fim da onda?
 
 Se a resposta for sim, expandir.
 
 Se não, ajustar principalmente:
 
-velocidade;
+velocidade do rover e dos inimigos;
 
-raio do ímã;
+dano e HP;
 
-comportamento da atração;
+cadência e alcance das armas;
 
-quantidade de objetos;
+tamanho e ritmo das rajadas;
 
-distribuição pelo mapa;
+duração dos respiros;
 
-visual e maleabilidade da fila de cubos;
-
-efeito da descarga;
+feedback de hit e morte;
 
 tamanho do mapa.
 
-O principal diferencial do jogo deve estar na sensação produzida por essas ações, e não na quantidade de sistemas.
+O principal diferencial do jogo deve estar na sensação do combate arcade e no loadout de armas — não na quantidade de sistemas.
+
+28. Legado (código existente)
+
+O repositório contém uma implementação anterior do loop magnético (coleta, fila, processadora, energia). Esse código é legado e deve ser removido ou substituído conforme as fases acima.
+
+Reaproveitar quando possível:
+
+Rover (movimento), VirtualJoystick, câmera, RunState;
+
+Save (estrutura base), HubBar, StageCarousel;
+
+MenuScene, ResultScene, GarageScene (repurpose);
+
+mapa workshop, obstáculos, Capacitor/Android.
+
+Substituir ou remover:
+
+MagnetSystem, CargoSystem, DumpSystem, EnergySystem, ProgressSystem, RegionClearSystem;
+
+entidades Scrap, Processor, EnergyPickup;
+
+HUD EnergyBar, CleanBar, CargoIndicator;
+
+ShopScene.
+
+29. Combate e detecção de colisão
+
+Sem Arcade Physics no MVP, salvo necessidade futura explícita.
+
+Usar interpolação para movimento e projéteis.
+
+Hit detection: distância ou AABB simples.
+
+Projéteis podem ser bloqueados por obstáculos.
+
+Inimigos não se empilham com pathfinding — perseguição direta com clamp no mapa.
+
+30. Tutorial
+
+Reescrever para o novo loop. Proposta de 4 passos:
+
+mover com o joystick;
+
+armas disparam sozinhas — posicione-se;
+
+evite contato — o HP cai;
+
+elimine todos os inimigos da onda.
+
+Gate no primeiro stage; skippable; sem sistema de missões.
+
+31. Áudio e haptics
+
+Manter helpers centralizados (Audio, Haptics).
+
+SFX: disparo, impacto, morte de inimigo, dano no rover, vitória, derrota.
+
+Vibração leve em dano recebido e morte de inimigo.
+
+Falha ao carregar áudio não deve quebrar a partida.
+
+32. Nome e posicionamento
+
+Gênero: survival action top-down, sessões curtas.
+
+Nome comercial em aberto (ver §33).
+
+Internamente pode usar working title Rover Survival até definição de marketing.
+
+33. Decisões em aberto (Open decisions)
+
+Itens ainda não fechados no design. Cada um inclui recomendação para o MVP.
+
+| # | Ponto | Opções | Recomendação |
+| --- | --- | --- | --- |
+| 1 | Nome do jogo | Manter "Magnet Rover" vs renomear | Renomear quando marketing definir; doc interno: working title Rover Survival |
+| 2 | Dano inimigo | Só contato vs contato + disparo | Começar só contato; ranged pós-MVP |
+| 3 | Moedas in-run | Drop instantâneo vs só no Result | Só no Result (menos ruído no HUD) |
+| 4 | HP regen | Nenhum vs pickup raro | Nenhum no MVP; pickup % como power-up futuro |
+| 5 | Desbloqueio de armas | Todas no início vs por stage | 2 armas no início, +1 por stage vencido |
+| 6 | Invulnerabilidade | I-frames após hit? | 300 ms i-frames + flash vermelho |
+| 7 | Friendly fire | Projéteis e obstáculos | Obstáculos bloqueiam projéteis; sem friendly fire entre inimigos |
+| 8 | Dificuldade entre stages | Só contagem/HP vs tipos mistos | Escalar HP + contagem nos 5 stages; tipos mistos pós-MVP |
+| 9 | Tutorial | Conteúdo dos passos | Mover → armas automáticas → evitar dano → eliminar onda |
+| 10 | ShopScene | Deletar vs repurpose | Remover do design; Inventory + Garage cobrem tudo |

@@ -3,6 +3,7 @@ import { GameConfig } from './config/GameConfig';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
 import { GarageScene } from './scenes/GarageScene';
+import { InventoryScene } from './scenes/InventoryScene';
 import { MenuScene } from './scenes/MenuScene';
 import { ResultScene } from './scenes/ResultScene';
 
@@ -21,6 +22,6 @@ export function createGame(): Game {
     pixelArt: false,
     roundPixels: false,
     mipmapFilter: 'LINEAR_MIPMAP_LINEAR',
-    scene: [BootScene, MenuScene, GarageScene, GameScene, ResultScene],
+    scene: [BootScene, MenuScene, InventoryScene, GarageScene, GameScene, ResultScene],
   });
 }

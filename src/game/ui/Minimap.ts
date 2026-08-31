@@ -2,10 +2,8 @@ import { GameObjects, Scene } from 'phaser';
 import { ignoreWorldCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
 import { bindViewResize, safeInsets } from './viewSize';
-import type { EnergyPickup } from '../entities/EnergyPickup';
-import type { Processor } from '../entities/Processor';
+import type { Enemy } from '../entities/Enemy';
 import type { Rover } from '../entities/Rover';
-import type { Scrap } from '../entities/Scrap';
 
 type MapRect = {
   x: number;
@@ -15,7 +13,7 @@ type MapRect = {
   scale: number;
 };
 
-/** Sci-fi HUD radar: full map, rover heading, floor scrap, energy pickups. */
+/** Sci-fi HUD radar: rover heading and enemy blips. */
 export class Minimap {
   private readonly markers: GameObjects.Graphics;
   private readonly root: GameObjects.Container;
@@ -50,59 +48,25 @@ export class Minimap {
     const hud = GameConfig.hud;
     const cfg = hud.minimap;
     const inset = safeInsets(this.root.scene);
-    const cleanHeight = hud.cleanPanelHeight * hud.cleanPanelScale;
+    const topOffset = GameConfig.hudSurvival.wavePanelMarginTop + GameConfig.hudSurvival.wavePanelHeight;
     this.root.setPosition(
       inset.left + hud.marginX,
-      inset.top + hud.cleanPanelMarginTop + cleanHeight + cfg.gapBelowBars,
+      inset.top + topOffset + cfg.gapBelowBars,
     );
   }
 
-  public updateMarkers(
-    rover: Rover,
-    scraps: readonly Scrap[],
-    pickups: readonly EnergyPickup[],
-    processor: Processor,
-  ): void {
+  public updateEnemies(rover: Rover, enemies: readonly Enemy[]): void {
     const cfg = GameConfig.hud.minimap;
     const g = this.markers;
     g.clear();
 
-    const processorPos = this.worldToLocal(processor.x, processor.y);
-    const half = cfg.processorSize / 2;
-    g.fillStyle(cfg.processorColor, 1);
-    g.fillTriangle(
-      processorPos.x,
-      processorPos.y - half,
-      processorPos.x + half,
-      processorPos.y,
-      processorPos.x,
-      processorPos.y + half,
-    );
-    g.fillTriangle(
-      processorPos.x,
-      processorPos.y - half,
-      processorPos.x - half,
-      processorPos.y,
-      processorPos.x,
-      processorPos.y + half,
-    );
-
-    for (const scrap of scraps) {
-      if (scrap.state !== 'Idle' && scrap.state !== 'Attracted') {
+    for (const enemy of enemies) {
+      if (!enemy.active) {
         continue;
       }
-      const p = this.worldToLocal(scrap.x, scrap.y);
-      g.fillStyle(cfg.scrapColor, 1);
+      const p = this.worldToLocal(enemy.x, enemy.y);
+      g.fillStyle(0xff6b6b, 1);
       g.fillCircle(p.x, p.y, cfg.scrapRadius);
-    }
-
-    for (const pickup of pickups) {
-      if (pickup.collected) {
-        continue;
-      }
-      const p = this.worldToLocal(pickup.x, pickup.y);
-      g.fillStyle(cfg.energyColor, 1);
-      g.fillCircle(p.x, p.y, cfg.energyRadius);
     }
 
     const roverPos = this.worldToLocal(rover.x, rover.y);

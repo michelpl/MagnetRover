@@ -6,15 +6,12 @@ import { viewSize } from '../ui/viewSize';
 
 export type ResultPayload = {
   outcome: 'Won' | 'Lost';
-  cleanPercentage: number;
-  levelId: number;
+  stageId: number;
+  kills: number;
   coinsEarned: number;
 };
 
-/**
- * Victory / defeat summary. Win rewards apply once on create.
- * Registry key: `resultPayload`.
- */
+/** Victory / defeat summary for survival runs. */
 export class ResultScene extends Scene {
   public constructor() {
     super('ResultScene');
@@ -23,11 +20,11 @@ export class ResultScene extends Scene {
   public create(): void {
     const payload = this.registry.get('resultPayload') as ResultPayload | undefined;
     const outcome = payload?.outcome ?? 'Won';
-    const clean = Math.floor(payload?.cleanPercentage ?? 0);
-    const levelId = payload?.levelId ?? 1;
+    const stageId = payload?.stageId ?? 1;
+    const kills = payload?.kills ?? 0;
     const coinsEarned = payload?.coinsEarned ?? 0;
     const isWin = outcome === 'Won';
-    const save = this.settleWin(isWin, levelId, coinsEarned);
+    const save = this.settleWin(isWin, stageId, coinsEarned);
 
     const { width, height } = viewSize(this);
     this.add.rectangle(width / 2, height / 2, width, height, 0x0d0d10, 0.92);
@@ -46,7 +43,7 @@ export class ResultScene extends Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, height / 2 - 200, `Clean ${clean}%`, {
+      .text(width / 2, height / 2 - 200, `Kills: ${kills}`, {
         fontFamily: GameConfig.ui.fontFamily,
         fontSize: '36px',
         color: '#ced4da',
@@ -70,22 +67,26 @@ export class ResultScene extends Scene {
       .setOrigin(0.5);
 
     if (isWin) {
-      const nextId = getNextLevelId(levelId);
-      this.addButton(width / 2, height / 2 + 40, 'Garage', GameConfig.colors.magnetGlow, () => {
+      const nextId = getNextLevelId(stageId);
+      this.addButton(width / 2, height / 2 + 40, 'Retry', GameConfig.colors.roverAccent, () => {
+        this.registry.set('activeLevelId', stageId);
+        this.scene.start('GameScene');
+      });
+      this.addButton(width / 2, height / 2 + 150, 'Garage', GameConfig.colors.magnetGlow, () => {
         this.scene.start('GarageScene');
       });
-      this.addButton(width / 2, height / 2 + 150, 'Stages', GameConfig.colors.roverAccent, () => {
+      this.addButton(width / 2, height / 2 + 260, 'Stages', GameConfig.colors.processorAccent, () => {
         this.scene.start('MenuScene');
       });
-      if (nextId !== levelId) {
-        this.addButton(width / 2, height / 2 + 260, 'Next', GameConfig.colors.processorAccent, () => {
+      if (nextId !== stageId) {
+        this.addButton(width / 2, height / 2 + 370, 'Next', GameConfig.colors.roverCabin, () => {
           this.registry.set('activeLevelId', nextId);
           this.scene.start('GameScene');
         });
       }
     } else {
       this.addButton(width / 2, height / 2 + 80, 'Retry', GameConfig.colors.roverAccent, () => {
-        this.registry.set('activeLevelId', levelId);
+        this.registry.set('activeLevelId', stageId);
         this.scene.start('GameScene');
       });
       this.addButton(width / 2, height / 2 + 190, 'Menu', GameConfig.colors.roverCabin, () => {
@@ -94,14 +95,14 @@ export class ResultScene extends Scene {
     }
   }
 
-  private settleWin(isWin: boolean, levelId: number, coinsEarned: number) {
+  private settleWin(isWin: boolean, stageId: number, coinsEarned: number) {
     if (!isWin) {
       return Save.load();
     }
     if (this.registry.get('resultSettled') === true) {
       return Save.load();
     }
-    const save = Save.applyWin(levelId, coinsEarned);
+    const save = Save.applyWin(stageId, coinsEarned);
     this.registry.set('resultSettled', true);
     return save;
   }

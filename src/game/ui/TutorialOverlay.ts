@@ -7,22 +7,10 @@ import { ignoreWorldCamera } from '../cameras/GameCameras';
 import { viewSize } from './viewSize';
 
 const STEPS: readonly { title: string; body: string }[] = [
-  {
-    title: 'Drive',
-    body: 'Slide the stick to move the rover.',
-  },
-  {
-    title: 'Magnet',
-    body: 'The magnet sits behind you. Sweep it through scrap.',
-  },
-  {
-    title: 'Queue',
-    body: 'Cubes lock into a chain behind the rover.',
-  },
-  {
-    title: 'Dump',
-    body: 'Drive onto the green pad to unload.',
-  },
+  { title: 'Drive', body: 'Slide the stick to move the rover.' },
+  { title: 'Auto weapons', body: 'Equipped weapons fire automatically.' },
+  { title: 'Avoid damage', body: 'Hostile rovers drain your HP on contact.' },
+  { title: 'Clear the wave', body: 'Eliminate all enemies to win the stage.' },
 ];
 
 const CARD_WIDTH = 920;
@@ -30,14 +18,12 @@ const CARD_HEIGHT = 280;
 
 export type TutorialSignals = {
   moving: boolean;
-  attracted: boolean;
-  queued: boolean;
-  dumped: boolean;
+  fired: boolean;
+  damaged: boolean;
+  cleared: boolean;
 };
 
-/**
- * First-run cues on stage 1. Joystick stays free; only Skip is interactive.
- */
+/** First-run survival cues on stage 1. */
 export class TutorialOverlay {
   private readonly root: GameObjects.Container;
   private readonly title: GameObjects.Text;
@@ -111,15 +97,15 @@ export class TutorialOverlay {
       this.advance();
       return;
     }
-    if (this.step === 1 && (signals.attracted || signals.queued)) {
+    if (this.step === 1 && signals.fired) {
       this.advance();
       return;
     }
-    if (this.step === 2 && signals.queued) {
+    if (this.step === 2 && signals.damaged) {
       this.advance();
       return;
     }
-    if (this.step === 3 && signals.dumped) {
+    if (this.step === 3 && signals.cleared) {
       this.complete();
     }
   }

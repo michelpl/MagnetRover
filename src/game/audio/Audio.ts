@@ -7,7 +7,13 @@ export type SfxKey =
   | 'dump'
   | 'full'
   | 'clean'
-  | 'ui';
+  | 'ui'
+  | 'fire'
+  | 'hit'
+  | 'enemyDeath'
+  | 'hurt'
+  | 'win'
+  | 'lose';
 
 /**
  * Failure-safe one-shot SFX. Missing keys never throw into gameplay.

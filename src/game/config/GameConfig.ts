@@ -145,8 +145,8 @@ export const GameConfig = {
     /** Fraction of max energy restored by one EnergyPickup (US-034). */
     pickupBonusRatio: 0.2,
   },
-  /** 1 coin per cube dumped at the processor. */
   coins: {
+    perKill: 1,
     perScrap: 1,
   },
   /**
@@ -289,10 +289,8 @@ export const GameConfig = {
     },
   },
   /**
-   * Capacity / battery / speed / magnet tiers (US-030).
-   * Tier index 0 is the base value; costs[i] buys the next value.
-   * Assumed shop order: capacity → battery → speed → magnet, then T2+ of each.
-   * Stage scrap counts fund that order on a first-clear campaign (see recipes.ts).
+   * Legacy capacity / battery / speed / magnet tiers.
+   * Garage uses roverUpgrades for survival — kept for save migration only.
    */
   upgrades: {
     enabled: true,
@@ -312,6 +310,41 @@ export const GameConfig = {
       values: [70, 85, 105, 125],
       costs: [12, 30, 70],
     },
+  },
+  /** Survival combat tunables. */
+  survival: {
+    baseMaxHp: 100,
+    baseArmor: 0,
+    invulnMs: 300,
+    hitFlashMs: 120,
+    roverDamageFlashMs: 150,
+    contactOverlapRadius: 32,
+    weaponDamageMultiplier: 1,
+    weaponUpgradeDamagePerTier: 4,
+    spawnMinDistanceFromRover: 220,
+    spawnEdgeInset: 80,
+    projectilePoolSize: 48,
+    killShakeDurationMs: 120,
+    killShakeIntensity: 0.006,
+    muzzleFlashMs: 80,
+    stageCoinBonus: [10, 15, 20, 25, 35] as readonly number[],
+  },
+  roverUpgrades: {
+    hp: { values: [100, 120, 145, 175] as readonly number[], costs: [12, 30, 70] as readonly number[] },
+    speed: { values: [160, 180, 200, 220] as readonly number[], costs: [12, 30, 70] as readonly number[] },
+    armor: { values: [0, 2, 4, 6] as readonly number[], costs: [12, 30, 70] as readonly number[] },
+  },
+  weaponUpgradeConfig: {
+    maxTier: 3,
+    costs: [12, 30, 70] as readonly number[],
+  },
+  hudSurvival: {
+    hpBarWidth: 420,
+    hpBarHeight: 28,
+    hpBarMarginBottom: 420,
+    wavePanelWidth: 320,
+    wavePanelHeight: 56,
+    wavePanelMarginTop: 196,
   },
 } as const;
 
