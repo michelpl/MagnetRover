@@ -1,4 +1,4 @@
-# Magnet Rover — MVP roadmap
+# Magnet Rover — Survival roadmap
 
 Source of truth: [MVP.md](MVP.md). This file turns that spec into stories and tasks.
 
@@ -6,507 +6,412 @@ Status key:
 
 - `[x]` done
 - `[ ]` not started
+- `[~]` superseded (old magnet/collection design — do not implement)
 
-Out of scope for MVP (do not pick up): enemies, combat, realistic physics, pathfinding, multiplayer, skill trees, crafting, inventory, quests, regenerative energy, multiple processor types, level map, look-ahead camera.
+---
+
+## Design pivot
+
+The game loop changed from **magnet collection** (scrap → cargo queue → processor → energy) to **survival combat** (HP → enemy waves → auto-fire weapons → loadout).
+
+All stories below **US-100+** target the new design. Stories **US-001–US-038** are superseded unless noted as reusable infrastructure.
 
 ---
 
 ## Current snapshot
 
-Already in the repo:
+### Reuse (keep or adapt)
 
-- Phaser 4 + TypeScript + Vite
-- `BootScene` → `GameScene`
-- Map larger than the viewport (2000 × 3000)
-- Rover placeholder with WASD / arrow keys
-- Camera follow with lerp, clamped to map bounds
-- Rover clamped to the map
+- Phaser 4 + TypeScript + Vite + Capacitor shell
+- `BootScene`, `MenuScene`, `GarageScene`, `GameScene`, `ResultScene`
+- `Rover` movement, `VirtualJoystick`, `GameCameras`, map clamp
+- Workshop map (`scenario1`), obstacle support
+- `HubBar`, `StageCarousel`, `WalletBar`, pause/settings
+- `Save` / `Upgrades` shape (extend for weapons + loadout)
+- `RunState`, `Audio`, `Haptics`, Android build scripts
 
-Still missing: touch joystick, metallic cubes, rear magnet, malleable cargo queue, processor, energy, HUD, win/lose, feel, coins, upgrades, save, extra levels, Capacitor/Android.
+### Legacy (remove or replace)
 
----
-
-## Epic 0 — Prototype slice
-
-One playable level that answers: is it fun to drive, pull metallic cubes with the rear magnet, grow a malleable trailing queue, and dump at the processor?
-
-Target config (MVP §28): map 2000 × 3000, 100 metallic cubes, capacity 20, energy 100, 1 processor, 0 energy pickups, upgrades off.
-
-### US-001 — Project bootstrap
-
-As a developer, I can run the game in the browser so we can iterate on feel.
-
-**Done when:** `npm run dev` opens a portrait 1080 × 1920 Phaser canvas.
-
-- [x] Scaffold Vite + TypeScript + Phaser
-- [x] Create `Game.ts`, `BootScene`, `GameScene`
-- [x] Put tunables in `GameConfig` (no magic numbers in update)
-- [x] Use `Scale.FIT` and center the canvas
-- [x] Keep `systems/` and `ui/` empty until those features land (folders exist only when needed)
-
-### US-002 — Oversized map
-
-As a player, I see a world larger than the screen so exploration feels real.
-
-**Done when:** the map is bigger than the viewport and has a clear edge.
-
-- [x] Draw a filled map with a light grid
-- [x] Draw a visible map border
-- [x] Size the first level at 2000 × 3000
-
-### US-003 — Rover on screen
-
-As a player, I can identify the Magnet Rover from a top-down camera.
-
-**Done when:** a small, readable vehicle sits on the map.
-
-- [x] Create `Rover` as a Phaser container with placeholder graphics
-- [ ] Draw a visible rear magnet (anchor + radius ring / glow) on the rover
-- [x] Spawn the rover at a sensible start position
-
-### US-004 — Arcade movement (desktop)
-
-As a player, I can drive the rover with keyboard input while iterating on desktop.
-
-**Done when:** WASD and arrows move the rover with arcade smoothing, clamped to the map.
-
-- [x] Read WASD and arrow keys
-- [x] Normalize diagonal input
-- [x] Lerp velocity toward target speed (no realistic steering)
-- [x] Rotate the rover toward movement
-- [x] Clamp the rover to map bounds
-
-### US-005 — Follow camera
-
-As a player, the camera stays on the rover and never shows outside the map.
-
-**Done when:** the camera follows with a small lerp and respects map bounds.
-
-- [x] `startFollow` with lerp `0.08`
-- [x] `setBounds` to the map
-- [ ] Do **not** add look-ahead (post-MVP)
+- **Entities:** `Scrap`, `Processor`, `EnergyPickup`
+- **Systems:** `MagnetSystem`, `CargoSystem`, `DumpSystem`, `EnergySystem`, `ProgressSystem`, `RegionClearSystem`
+- **UI:** `EnergyBar`, `CleanBar`, `CargoIndicator` (replace with `HpBar`, `WaveIndicator`)
+- **Levels:** scrap recipes, energy balance solver, processor placement
+- **Upgrades:** capacity, battery, magnet radius lines
+- **Scenes:** `ShopScene` (remove — Inventory + Garage cover meta)
+- **Tutorial:** magnet/cargo/processor copy
 
 ---
 
-## Epic 1 — Core magnet loop
+## Epic E0 — Documentation pivot
 
-### US-006 — Virtual joystick
+Align all docs with the survival loop before code changes.
 
-As a player, I can drive with one thumb on a phone.
+### US-100 — MVP rewrite
 
-**Done when:** a transparent joystick at the bottom-center of the screen moves the rover; keyboard still works on desktop.
+As a developer, I have a single spec for the survival loop.
 
-- [ ] Add a virtual joystick (bottom center, semi-transparent)
-- [ ] Map drag direction to arcade movement (up/down/left/right)
-- [ ] Keep the same smoothing as keyboard input
-- [ ] Hide or ignore the joystick when there is no pointer
-- [ ] Do not block the rest of the screen for camera / HUD
+**Done when:** [MVP.md](MVP.md) describes HP, waves, weapons, inventory, stages, save, and open decisions.
 
-### US-007 — Level data
+- [x] Rewrite MVP.md for survival combat
+- [x] Document deprecated legacy systems
+- [x] Add open decisions table (§33)
 
-As a designer, I can define a level without changing gameplay code.
+### US-101 — Agent and Cursor rules
 
-**Done when:** the first level loads from `LevelConfig` (map size, processor, scrap/cube list, optional pickups).
+As an agent, I follow rules that match the new game loop.
 
-- [ ] Add `LevelConfig` (`id`, `mapWidth`, `mapHeight`, `initialEnergy`, `processor`, `scraps`, optional `powerUps`)
-- [ ] Add `Levels.ts` with the prototype level (100 metallic cubes, 1 processor, 0 pickups)
-- [ ] Spawn entities from config in `GameScene` (scene wires, does not own math)
-- [ ] Keep cube `color` and `size` visual-only (same gameplay for every cube)
+**Done when:** [AGENTS.md](AGENTS.md) and `.cursor/rules/*.mdc` forbid magnet/scrap/energy and allow combat/inventory.
 
-### US-008 — Metallic cubes on the map
+- [x] Update AGENTS.md
+- [x] Update project-premises, architecture, phaser, english-language rules
 
-As a player, I see metallic cubes of different colors and sizes scattered across the level.
+### US-102 — Roadmap rewrite
 
-**Done when:** ~100 cubes are visible, all counting as 1 object, idle until attracted.
+As a developer, I have a backlog for survival features, not scrap collection.
 
-- [ ] Create `Scrap` entity (metallic cube) with `ScrapState` (`Idle`, `Attracted`, `Carried`, `Processing`)
-- [ ] Add `color` and `size` (`small` | `medium` | `large`) fields
-- [ ] Spawn cubes from `LevelConfig`
-- [ ] Use placeholder cube graphics (varied color + size only)
-- [ ] Do not add weight, rarity, or different coin values
+**Done when:** this file lists E0–E6 with new stories; old US marked superseded.
 
-### US-009 — Rear magnet radius and attraction
-
-As a player, cubes inside the rear magnet radius fly toward the magnet (or the end of the cargo queue).
-
-**Done when:** idle cube within `magnetRadius` of the rear `magnetAnchor` becomes `Attracted` and interpolates toward the magnet / queue tip.
-
-- [ ] Create `MagnetSystem`
-- [ ] Place a visible magnet anchor at the back of the rover
-- [ ] Draw the magnet radius from that rear anchor
-- [ ] If `distance(scrap, magnetAnchor) <= magnetRadius`, set state to `Attracted`
-- [ ] Attract with interpolation toward the rear magnet (or the tip of the existing queue)
-- [ ] Do **not** use Arcade Physics or any physics plugin
-- [ ] Put `magnetRadius` and `attractionSpeed` in `GameConfig`
-
-### US-010 — Malleable trailing cargo queue
-
-As a player, attracted cubes join a soft chain behind the rover and follow its turns.
-
-**Done when:** cube near the magnet / queue tip becomes `Carried` and follows the previous segment with smooth interpolation (snake / train feel).
-
-- [ ] Create `CargoSystem` as an ordered queue (`cargo: Scrap[]`)
-- [ ] First carried cube follows the rear magnet anchor
-- [ ] Each following cube follows the previous cube
-- [ ] Use smooth follow / lerp so the queue bends with rover movement
-- [ ] Keep the queue malleable — no fixed `CargoSlot` grid around the rover
-- [ ] Cubes of different colors and sizes share the same queue rules
-
-### US-011 — Capacity limit
-
-As a player, I stop picking up cubes when the rover is full, but I can still drive.
-
-**Done when:** `carriedObjects >= capacity` blocks new pickups; cubes stay on the map; movement is not blocked.
-
-- [ ] Default `capacity = 20`
-- [ ] Ignore new attractions while full (or drop them back to `Idle`)
-- [ ] Show a short full-cargo cue (flash / “FULL” / processor hint)
-- [ ] Do not freeze movement when full
+- [x] Rewrite ROADMAP.md (this file)
 
 ---
 
-## Epic 2 — Game loop
+## Epic E1 — Core combat
 
-### US-012 — Processor
+Remove legacy loop pieces; add HP, enemies, win/lose.
 
-As a player, I can find one processor that is visually distinct from the rest of the map.
+### US-110 — Strip legacy gameplay
 
-**Done when:** the level has a single processor with a dump area.
+As a developer, the game no longer references magnet, cargo, processor, or energy in the active loop.
 
-- [ ] Create `Processor` with `processingArea`
-- [ ] Spawn from `LevelConfig.processor`
-- [ ] Make it clearly different from cubes and the rover (placeholder is fine)
+**Done when:** `GameScene` does not wire Magnet/Cargo/Dump/Energy/Progress systems; Scrap/Processor/EnergyPickup not spawned.
 
-### US-013 — Dump cargo
+- [ ] Remove legacy system wiring from `GameScene`
+- [ ] Delete or archive unused legacy files (after replacement exists)
+- [ ] Remove scrap/processor assets from boot preload if unused
 
-As a player, driving a loaded rover into the processor unloads cubes one by one from the queue.
+### US-111 — Rover HP
 
-**Done when:** carried cubes go `Processing`, tween into the machine at 20–60 ms each (from the queue tip preferred), then leave the world.
+As a player, I have a health bar and lose when it reaches zero.
 
-- [ ] Detect rover overlap with the processor area
-- [ ] Only dump while `carriedObjects > 0`
-- [ ] Unload sequentially from the cargo queue (not all at once)
-- [ ] Tween scale / rotation toward the processor
-- [ ] Remove cube permanently after processing
-- [ ] Update remaining / carried counts as each item finishes
+**Done when:** rover has `maxHp` / `hp`; damage reduces hp; `hp <= 0` triggers defeat.
 
-### US-014 — Energy drain
+- [ ] Add HP fields to `Rover` (or `HpSystem` owner)
+- [ ] Create `HpSystem` for damage, i-frames (300 ms per MVP recommendation)
+- [ ] Create `HpBar` UI (replaces `EnergyBar`)
+- [ ] Put base HP and armor in `GameConfig`
 
-As a player, energy only drops while I am moving, so standing still is free.
+### US-112 — Enemy placeholder
 
-**Done when:** energy starts at 100% and drains only when the rover is moving.
+As a player, hostile rovers chase me on the map.
 
-- [ ] Create `EnergySystem`
-- [ ] `energy -= movementEnergyCost * delta` while moving
-- [ ] Do not drain on collect, dump, or idle
-- [ ] Do not regenerate energy
-- [ ] Put `initialEnergy` and `movementEnergyCost` in config / level data
+**Done when:** `Enemy` entity spawns, pursues player with arcade lerp, clamps to map.
 
-### US-015 — In-run HUD
+- [ ] Create `Enemy` entity (hostile rover tint)
+- [ ] Chase behavior: move toward player, no A* pathfinding
+- [ ] Stats from `enemyRecipe` in stage config
 
-As a player, I can see energy, cleanup progress, and cargo at a glance without relying only on the HUD.
+### US-113 — Contact damage
 
-**Done when:** a minimal HUD shows energy bar, cleanup bar, and optional `12 / 20` cargo.
+As a player, touching an enemy damages my rover.
 
-- [ ] Create `EnergyBar` (top)
-- [ ] Create `CleanBar` (cleanup %)
-- [ ] Create `CargoIndicator` (`carried / capacity`)
-- [ ] Prefer cleanup % over a remaining-count label
-- [ ] Keep HUD readable on a phone; the trailing cube queue remains the main fullness cue
+**Done when:** overlap between rover and enemy applies `contactDamage` respecting i-frames and armor.
 
-### US-016 — Cleanup progress
+- [ ] Create `CombatSystem` (damage, death, simple AABB/distance checks)
+- [ ] Enemy death removes entity and decrements `remainingEnemies`
+- [ ] Hit feedback: flash, optional SFX/haptics
 
-As a player, I can tell how much of the map I have cleared.
+### US-114 — Win and lose
 
-**Done when:** `cleanPercentage = ((totalObjects - remainingObjects) / totalObjects) * 100`.
+As a player, I win when all enemies are gone; I lose when HP hits zero.
 
-- [ ] Create `ProgressSystem`
-- [ ] Track `totalObjects`, `remainingObjects`, `carriedObjects`
-- [ ] `remainingObjects` excludes cubes that have been processed
-- [ ] Drive the cleanup bar from this value
+**Done when:** `remainingEnemies === 0 && waveFullySpawned` → win; `roverHp <= 0` → lose.
 
-### US-017 — Win
-
-As a player, I win only after every cube is gone from the map **and** my cargo queue is empty.
-
-**Done when:** `remainingObjects == 0 AND carriedObjects == 0` ends the level as a win.
-
-- [ ] Detect the win condition in `ProgressSystem` (or a thin game-state helper)
-- [ ] Stop energy drain and input after win
-- [ ] Hand off to a result flow (even a stub is enough for this story)
-
-### US-018 — Lose
-
-As a player, I lose if energy hits 0 before the level is complete.
-
-**Done when:** `energy <= 0` and the level is not won → defeat.
-
-- [ ] Detect lose in `EnergySystem` / game state
-- [ ] Stop movement when energy is 0
-- [ ] Hand off to retry
-
-### US-019 — Retry
-
-As a player, I can restart the current level after a loss without reloading the page.
-
-**Done when:** Retry rebuilds the same `LevelConfig` from scratch.
-
-- [ ] Add a retry action on defeat
-- [ ] Reset rover, cubes, energy, cargo queue, and HUD
-- [ ] Do not keep processed cubes or spent energy
-
-### US-020 — Result screen
-
-As a player, I see a short win or lose screen before the next step.
-
-**Done when:** `ResultScene` shows victory (reward + continue) or defeat (retry).
-
-- [ ] Create `ResultScene`
-- [ ] Victory: summary + path to upgrades (or next level while upgrades are off)
-- [ ] Defeat: retry
-- [ ] Keep copy in English
-
-### US-021 — Main menu
-
-As a player, I can start a run from a menu instead of dropping straight into the map.
-
-**Done when:** `MenuScene` → play starts the current level.
-
-- [ ] Create `MenuScene`
-- [ ] Play starts `GameScene` with the current level
-- [ ] Wire Boot → Menu → Game in `Game.ts`
+- [ ] Update `RunState` transitions
+- [ ] Wire `ResultScene` for survival outcomes (coins placeholder OK)
+- [ ] Retry resets rover HP, enemies, wave state
 
 ---
 
-## Epic 3 — Game feel
+## Epic E2 — Weapons
 
-Do not treat this as polish-only. Feel is the product.
+Auto-fire loadout weapons (up to 4).
 
-### US-022 — Attract feedback
+### US-120 — Weapon definitions
 
-As a player, cubes feel magnetic when they enter the rear magnet radius.
+As a designer, weapons are data-driven.
 
-- [ ] Small cube rotation while attracted
-- [ ] Speed up toward the rear magnet / queue tip
-- [ ] Optional glow
-- [ ] Short metallic SFX
+**Done when:** `Weapons.ts` defines at least 4 placeholder weapons with damage, fireRate, range.
 
-### US-023 — Queue-join feedback
+- [ ] Add `WeaponDefinition` type
+- [ ] Ship Pulse Cannon, Arc Turret, Orbit Drone, Mine Layer (behavior stubs OK initially)
+- [ ] Tunables in `GameConfig`
 
-As a player, I feel the click when a cube joins the trailing queue.
+### US-121 — WeaponSystem auto-fire
 
-- [ ] Small bounce on attach
-- [ ] Soft settle into the end of the queue
-- [ ] Click SFX
-- [ ] Light vibration (no-op on desktop)
+As a player, equipped weapons fire automatically on cooldown.
 
-### US-024 — Dump feedback
+**Done when:** each loadout slot runs its own cooldown timer and triggers attacks.
 
-As a player, unloading feels fast and juicy.
+- [ ] Create `WeaponSystem`
+- [ ] Read loadout from save/registry at run start
+- [ ] Max 4 active weapons per run
 
-- [ ] Suction tween into the processor
-- [ ] Staggered SFX
-- [ ] Particles
-- [ ] Coin pop / rising numbers (once coins exist)
-- [ ] Light screen shake
-- [ ] Light vibration
+### US-122 — Projectiles and hits
 
-### US-025 — Full-cargo feedback
+As a player, my weapons damage enemies.
 
-As a player, I know I am full without reading UI.
+**Done when:** projectile or instant-hit weapons reduce enemy HP; enemy dies at 0.
 
-- [ ] Short visual pulse on the rover / queue
-- [ ] Short SFX
-- [ ] Optional “FULL” toast
-- [ ] Hint toward the processor (pulse / marker)
+- [ ] Create `Projectile` entity (where needed)
+- [ ] `CombatSystem` resolves weapon hits on enemies
+- [ ] Obstacles block projectiles (per open decision #7)
 
-### US-026 — Region-clear feedback
+### US-123 — Weapon feel
 
-As a player, clearing a cluster feels like progress.
+As a player, shooting feels responsive.
 
-- [ ] Dust / sparkle when a local cluster is gone (simple radius or region tag is enough)
-- [ ] Optional “Clean!” text
-- [ ] Positive SFX
+**Done when:** muzzle flash or equivalent, impact SFX, light shake on kill.
 
-### US-027 — Audio and haptics plumbing
-
-As a developer, I can play SFX and vibration from gameplay events.
-
-- [ ] Add an audio folder and load clips in `BootScene`
-- [ ] Centralize play-one-shot helpers (do not scatter `sound.play` in entities)
-- [ ] Vibration helper that no-ops when Capacitor is absent
-- [ ] Mute / ignore audio failures so a missing file never breaks a run
+- [ ] Wire Audio/Haptics for fire and hit
+- [ ] No missing-asset crashes
 
 ---
 
-## Epic 4 — Progression
+## Epic E3 — Waves
 
-Prototype first. Turn this epic on after the core loop feels good.
+One wave per stage with bursts and breathers.
 
-### US-028 — Coins
+### US-130 — StageConfig + WaveConfig
 
-As a player, I earn 1 coin per processed cube, and coins persist between runs.
+As a designer, I define waves without code changes.
 
-**Done when:** `playerCoins += processedObjects` and the total survives a refresh.
+**Done when:** `StageConfig` replaces scrap-oriented `LevelConfig`; includes `wave.bursts[]`.
 
-- [ ] Award 1 coin per processed cube
-- [ ] Show a coin total on result / upgrade screens
-- [ ] No multipliers in MVP
+- [ ] Add `StageConfig.ts` and `Stages.ts` (or migrate `Levels.ts`)
+- [ ] Define `WaveConfig` burst shape: `count`, `intervalMs`, `delayAfterMs`
+- [ ] Rover spawns at map center (or `spawn` from config)
 
-### US-029 — Local save
+### US-131 — WaveSpawnSystem
 
-As a player, my coins, current level, and upgrades survive closing the tab.
+As a player, enemies arrive in bursts with short pauses between them.
 
-**Done when:** `localStorage` holds `{ coins, currentLevel, upgrades }`.
+**Done when:** spawns follow burst schedule; during `delayAfterMs` no new spawns; game does not pause.
 
-- [ ] Save/load helper around `localStorage`
-- [ ] Persist `capacity`, `magnetRadius`, `speed` upgrade levels
-- [ ] Default save if missing or corrupt
-- [ ] Keep this shape when Capacitor lands (no rewrite required)
+- [ ] Create `WaveSpawnSystem`
+- [ ] Track `waveFullySpawned`
+- [ ] Spawn at valid positions (avoid stacking on player — simple offset)
 
-### US-030 — Three upgrades
+### US-132 — Wave HUD
 
-As a player, I can spend coins on capacity, magnet radius, and speed.
+As a player, I know how many enemies remain.
 
-**Done when:** each upgrade has a few paid tiers and applies on the next run.
+**Done when:** `WaveIndicator` shows remaining count or wave progress (replaces `CleanBar`).
 
-| Upgrade        | Example tiers              |
-| -------------- | -------------------------- |
-| Capacity       | 20 → 25 → 30 → 40          |
-| Magnet radius  | 100 → 120 → 145 → 175 px   |
-| Speed          | 200 → 215 → 230 → 250      |
-| Cost           | 100 → 250 → 500 coins      |
+- [ ] Create `WaveIndicator.ts`
+- [ ] Remove `CleanBar` from HUD
 
-- [ ] Put upgrade tables in `GameConfig`
-- [ ] Apply purchased levels to the rover at run start
-- [ ] Allow a longer cargo queue when capacity increases
-- [ ] Refuse purchases the player cannot afford
-- [ ] Disable upgrades entirely until the prototype loop is fun (MVP §28)
+### US-133 — Five stage recipes
 
-### US-031 — Upgrade screen
+As a player, stages 1–5 get harder on the same map.
 
-As a player, after a win I can buy upgrades before the next level.
+**Done when:** 5 `StageConfig` entries scale enemy count/HP/speed; same `scenario1` background.
 
-**Done when:** `UpgradeScene` sits between result and the next level.
-
-- [ ] Create `UpgradeScene`
-- [ ] Show current coins and the three upgrade buttons
-- [ ] Continue / next-level button
-- [ ] Screen flow: Boot → Menu → Game → Result → Upgrades → next Game
-
-### US-032 — Linear level list
-
-As a player, winning moves me to the next numbered level.
-
-**Done when:** levels are `1, 2, 3, …` with no world map.
-
-- [ ] Store `currentLevel` in save data
-- [ ] Advance on victory
-- [ ] Replay last level if there is no next one (or show a simple “more later”)
-
-### US-033 — Extra levels
-
-As a player, later levels change layout, cube count, and optional energy pickups.
-
-**Done when:** at least 2–3 `LevelConfig` entries exist, still one processor each.
-
-- [ ] Author 2–3 maps larger than the viewport
-- [ ] Vary cube placement (workshop / junkyard style regions, not mazes)
-- [ ] Keep navigation obvious
-
-### US-034 — Energy pickup
-
-As a player, some levels have batteries that restore energy.
-
-**Done when:** one pickup type exists: `energy = min(maxEnergy, energy + energyBonus)`.
-
-- [ ] Create `EnergyPickup`
-- [ ] Spawn from optional `LevelConfig.powerUps` (`type: 'energy'`)
-- [ ] Bonus options: +10% / +20% / +25% — ship one value
-- [ ] Remove the pickup after collect
-- [ ] Do not add other pickup types
-
-### US-035 — Cube variety (visual)
-
-As a player, cubes look mixed even though every piece is worth 1.
-
-- [ ] Several colors and sizes of metallic cube placeholders
-- [ ] `color` and `size` in level data only select visuals
-- [ ] Same magnet, queue, and coin rules for all cubes
+- [ ] Author 5 wave recipes (replace scrap `STAGE_RECIPES`)
+- [ ] Keep obstacle slots where appropriate
+- [ ] Stage carousel still unlocks linearly
 
 ---
 
-## Epic 5 — Mobile ship
+## Epic E4 — Meta (inventory + garage)
 
-### US-036 — Capacitor shell
+Loadout, coins, permanent upgrades.
 
-As a player, I can run the game as an Android app.
+### US-140 — Save shape migration
 
-**Done when:** a Capacitor Android project builds and opens `GameScene`.
+As a player, my weapons and loadout persist.
 
-- [ ] Add Capacitor
-- [ ] Create the Android project
-- [ ] Confirm `localStorage` still works
-- [ ] Wire vibration through Capacitor when present
+**Done when:** save includes `ownedWeapons`, `loadout[4]`, `weaponUpgrades`, `roverUpgrades { hp, speed, armor }`.
 
-### US-037 — Phone layout and performance
+- [ ] Migrate `Save.ts` with backward-compatible default for old saves
+- [ ] Remove capacity/battery/magnet upgrade keys from new saves
 
-As a player, the game stays readable and smooth on a modest Android phone.
+### US-141 — InventoryScene
 
-**Done when:** one complete level runs without blocker bugs or heavy frame drops.
+As a player, I equip up to 4 weapons before a run.
 
-- [ ] Test portrait FIT on a few resolutions
-- [ ] Keep `update` cheap (no physics, modest cube count)
-- [ ] Confirm one-hand joystick reach
-- [ ] Confirm HUD does not cover the joystick
-- [ ] Generate APK
-- [ ] Generate AAB
+**Done when:** new scene lists owned weapons, 4 slots, confirms to save.
 
-### US-038 — First-run tutorial
+- [ ] Create `InventoryScene` + `InventoryUI`
+- [ ] Register in `Game.ts`
+- [ ] HubBar tab: Stages | Inventory | Garage
+- [ ] Remove `ShopScene` from design and code
 
-As a player, I understand move → rear magnet → trailing queue → dump → clean before the first real level.
+### US-142 — Weapon unlock progression
 
-**Done when:** a short, skippable cue covers movement, rear magnet, full cargo queue, and the processor.
+As a player, I unlock more weapons as I progress.
 
-- [ ] First-run only (gate on save data)
-- [ ] Do not add a quest system
-- [ ] Keep it to a few sentences or finger hints
+**Done when:** per MVP open decision #5 — 2 weapons at start, +1 per stage won (tunable).
+
+- [ ] Unlock logic in `Save.applyWin` or dedicated helper
+- [ ] Locked weapons visible but not equippable
+
+### US-143 — Garage repurpose
+
+As a player, I spend coins on rover and weapon upgrades.
+
+**Done when:** `GarageScene` shows HP, speed, armor + per-weapon upgrade tiers; old upgrade lines removed.
+
+- [ ] Replace `UpgradeCard` lines in garage
+- [ ] Apply upgrades at run start via `Upgrades.ts`
+- [ ] Costs from `GameConfig` (e.g. 12 / 30 / 70)
+
+### US-144 — Coins from combat
+
+As a player, I earn coins for kills and stage wins.
+
+**Done when:** coins credited on `ResultScene` (not in-run drops — per open decision #3).
+
+- [ ] `1 coin per kill` + stage bonus
+- [ ] Display on result screen
+
+---
+
+## Epic E5 — Content and feel
+
+Tutorial, juice, polish.
+
+### US-150 — Tutorial rewrite
+
+As a new player, I learn move → auto weapons → avoid damage → clear wave.
+
+**Done when:** `TutorialOverlay` on stage 1 matches survival steps; skippable; gated on `tutorialDone`.
+
+- [ ] Replace magnet/cargo/processor copy
+- [ ] First-run only
+
+### US-151 — Combat juice pass
+
+As a player, hits and kills feel satisfying.
+
+**Done when:** enemy hit flash, death particles, rover damage flash, screen shake on kill.
+
+- [ ] Reuse/extend existing VFX patterns from dump feedback where applicable
+- [ ] Tune shake intensity for mobile
+
+### US-152 — Minimap update
+
+As a player, the minimap helps in combat.
+
+**Done when:** minimap shows enemies instead of scrap/processor.
+
+- [ ] Update `Minimap.ts` blips
+
+### US-153 — Audio pass
+
+As a player, combat has distinct SFX.
+
+**Done when:** fire, hit, enemy death, player hurt, win, lose clips wired (failure-safe).
+
+- [ ] Preload in `BootScene` when assets exist
+
+---
+
+## Epic E6 — Mobile ship
+
+Keep existing Android criteria.
+
+### US-160 — Capacitor regression
+
+As a player, the survival build runs on Android.
+
+**Done when:** APK/AAB builds; immersive chrome; save works.
+
+- [x] Capacitor project exists (verify after combat refactor)
+- [ ] Re-test after legacy removal
+- [ ] Confirm one-hand joystick + HUD layout
+
+### US-161 — Performance
+
+As a player, combat stays smooth on modest phones.
+
+**Done when:** one full stage with max enemies and 4 weapons runs without blocker FPS drops.
+
+- [ ] Keep update loop cheap (no physics plugin)
+- [ ] Pool projectiles if count grows
+
+---
+
+## Superseded stories (magnet collection — do not implement)
+
+These tracked the old MVP. Kept for history only.
+
+| Story | Title | Superseded by |
+| ----- | ----- | ------------- |
+| US-006 | Virtual joystick | Reuse as-is — already done |
+| US-007 | Level data (scrap) | US-130 |
+| US-008 | Metallic cubes | US-112, US-131 |
+| US-009 | Rear magnet | Removed |
+| US-010 | Cargo queue | Removed |
+| US-011 | Capacity limit | Removed |
+| US-012 | Processor | Removed |
+| US-013 | Dump cargo | Removed |
+| US-014 | Energy drain | Removed |
+| US-015 | Energy/clean/cargo HUD | US-111, US-132 |
+| US-016 | Cleanup progress | US-132 |
+| US-017 | Win (clean map) | US-114 |
+| US-018 | Lose (energy) | US-114 |
+| US-019 | Retry | US-114 (reuse pattern) |
+| US-020 | Result screen | US-114 (adapt copy) |
+| US-021 | Main menu | Reuse — already done |
+| US-022–US-026 | Magnet/cargo/dump feel | US-123, US-151 |
+| US-027 | Audio plumbing | US-153 (reuse) |
+| US-028 | Coins (per scrap) | US-144 |
+| US-029 | Local save | US-140 |
+| US-030 | Three upgrades (magnet etc.) | US-143 |
+| US-031 | Upgrade screen | US-143 (Garage) |
+| US-032 | Linear levels | US-133 (reuse carousel) |
+| US-033 | Extra levels | US-133 |
+| US-034 | Energy pickup | Removed |
+| US-035 | Cube variety | Removed |
+| US-036–US-038 | Capacitor, perf, tutorial | US-160, US-161, US-150 |
+
+Partially done infrastructure (US-001–US-005, US-021): keep; do not revert.
 
 ---
 
 ## Suggested build order
 
-Work top to bottom. Do not start Epic 4 until Epic 1–2 feel good. Epic 3 can overlap Epic 2.
+Work top to bottom. Finish E1 before E4 meta. E5 can overlap E3–E4.
 
-| Order | Stories                         | Goal                                      |
-| ----- | ------------------------------- | ----------------------------------------- |
-| 1     | US-006 → US-011                 | Touch + rear magnet + malleable cube queue |
-| 2     | US-012 → US-021                 | Dump, energy, HUD, win / lose / retry     |
-| 3     | US-022 → US-027                 | Juice until the prototype question is yes |
-| 4     | US-028 → US-035                 | Coins, save, upgrades, extra levels       |
-| 5     | US-036 → US-038                 | Android + tutorial                        |
+| Order | Stories | Goal |
+| ----- | ------- | ---- |
+| 1 | US-100–US-102 | Documentation aligned |
+| 2 | US-110–US-114 | HP, enemy, contact damage, win/lose |
+| 3 | US-120–US-123 | Weapons + auto-fire |
+| 4 | US-130–US-133 | Waves + 5 stages |
+| 5 | US-140–US-144 | Inventory, garage, coins |
+| 6 | US-150–US-153 | Tutorial, feel, minimap, audio |
+| 7 | US-160–US-161 | Android regression + perf |
 
-Tune before adding systems: rover speed, magnet radius, attraction feel, cube count, cube layout, queue malleability, dump effect, map size.
+Tune before adding content: rover speed, enemy HP/speed, weapon DPS, burst timing, breather duration, map size.
 
 ---
 
-## MVP done
+## MVP done checklist
 
-The MVP is done when all of these are true:
+The survival MVP is done when all of these are true:
 
 - [ ] One-hand driving feels comfortable
 - [ ] Map is larger than the screen
 - [ ] Camera follows the rover
-- [ ] Cubes are attracted inside the rear magnet radius
-- [ ] Cubes form a malleable queue behind the rover
-- [ ] Cargo has a max capacity
-- [ ] Processor dumps the cargo queue
-- [ ] Processed cubes are gone for good
-- [ ] Energy drains only while moving
-- [ ] Energy 0 is a loss
-- [ ] Clear + dump everything is a win
-- [ ] Coins are awarded
-- [ ] Three basic upgrades work
-- [ ] Progress is saved
-- [ ] The game runs smoothly on Android
-- [ ] One full level can be played start to finish with no blocker bugs
+- [ ] HP bar visible; HP 0 = loss
+- [ ] Enemies chase the player
+- [ ] At least one weapon auto-fires; up to 4 in loadout
+- [ ] Wave spawns in bursts with breathers (no pause)
+- [ ] All enemies dead after full wave = win
+- [ ] Inventory saves loadout between sessions
+- [ ] Garage upgrades rover + weapons with coins
+- [ ] 5 stages on same map with rising difficulty
+- [ ] Progress saved in localStorage
+- [ ] Game runs smoothly on Android
+- [ ] One full stage playable start to finish without blocker bugs

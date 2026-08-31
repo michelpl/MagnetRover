@@ -28,8 +28,6 @@ export class BootScene extends Scene {
 
   private loadGameAssets(): void {
     this.load.image('scenario1', 'assets/ui/scenario1.png');
-    this.load.image('processor', 'assets/sprites/processor/processor.png');
-    this.load.image('scrap-gear', 'assets/sprites/scrap/gear.png');
     this.load.spritesheet('rover', 'assets/sprites/rover/rover.png', {
       frameWidth: GameConfig.rover.spriteFrameSize,
       frameHeight: GameConfig.rover.spriteFrameSize,
@@ -49,8 +47,6 @@ export class BootScene extends Scene {
       frameHeight: 384,
     });
     this.load.image('stage-lock', 'assets/ui/stage-lock.png');
-    this.load.image('energy-panel', 'assets/ui/energybar.png');
-    this.load.image('energy-unit', 'assets/ui/energy-unity.png');
   }
 
   private async finishBoot(): Promise<void> {
@@ -62,8 +58,6 @@ export class BootScene extends Scene {
     await document.fonts.ready;
     registerIconsetFrames(this);
     knockoutNearBlack(this, 'stage-lock');
-    knockoutBorderMatte(this, 'energy-panel', GameConfig.hud.energyPanel.matteThreshold);
-    knockoutBorderMatte(this, 'energy-unit', GameConfig.hud.energyPanel.matteThreshold);
     Audio.bind(this);
     this.scene.start('MenuScene');
   }
@@ -113,80 +107,6 @@ function knockoutNearBlack(scene: Scene, key: string, threshold = 16): void {
       data[i + 3] = 0;
     }
   }
-  ctx.putImageData(pixels, 0, 0);
-  scene.textures.remove(key);
-  scene.textures.addCanvas(key, canvas);
-}
-
-/**
- * Removes only the opaque black matte connected to an image edge. Dark panel
- * details enclosed by the artwork remain intact.
- */
-function knockoutBorderMatte(scene: Scene, key: string, threshold: number): void {
-  const image = scene.textures.get(key).getSourceImage();
-  if (!(image instanceof HTMLImageElement) && !(image instanceof HTMLCanvasElement)) {
-    throw new Error(`${key} source is not a drawable image`);
-  }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = image.width;
-  canvas.height = image.height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    throw new Error('2D canvas is required to process energy artwork');
-  }
-  ctx.drawImage(image, 0, 0);
-
-  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const { data } = pixels;
-  const pixelCount = canvas.width * canvas.height;
-  const pending = new Int32Array(pixelCount);
-  let head = 0;
-  let tail = 0;
-
-  const enqueueIfMatte = (pixelIndex: number): void => {
-    const offset = pixelIndex * 4;
-    const alpha = data[offset + 3] ?? 0;
-    const red = data[offset] ?? 0;
-    const green = data[offset + 1] ?? 0;
-    const blue = data[offset + 2] ?? 0;
-    if (alpha === 0 || red > threshold || green > threshold || blue > threshold) {
-      return;
-    }
-    data[offset + 3] = 0;
-    pending[tail] = pixelIndex;
-    tail += 1;
-  };
-
-  const { width, height } = canvas;
-  for (let x = 0; x < width; x += 1) {
-    enqueueIfMatte(x);
-    enqueueIfMatte((height - 1) * width + x);
-  }
-  for (let y = 1; y < height - 1; y += 1) {
-    enqueueIfMatte(y * width);
-    enqueueIfMatte(y * width + width - 1);
-  }
-
-  while (head < tail) {
-    const pixelIndex = pending[head];
-    head += 1;
-    const x = pixelIndex % width;
-    const y = Math.floor(pixelIndex / width);
-    if (x > 0) {
-      enqueueIfMatte(pixelIndex - 1);
-    }
-    if (x + 1 < width) {
-      enqueueIfMatte(pixelIndex + 1);
-    }
-    if (y > 0) {
-      enqueueIfMatte(pixelIndex - width);
-    }
-    if (y + 1 < height) {
-      enqueueIfMatte(pixelIndex + width);
-    }
-  }
-
   ctx.putImageData(pixels, 0, 0);
   scene.textures.remove(key);
   scene.textures.addCanvas(key, canvas);

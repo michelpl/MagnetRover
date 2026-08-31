@@ -1,60 +1,47 @@
 import { Geom, Scene } from 'phaser';
 import { Audio } from '../audio/Audio';
 import { GameConfig, isDebugMode } from '../config/GameConfig';
-import type { LevelConfig } from '../config/LevelConfig';
-import { getLevelById } from '../config/Levels';
-import { Processor } from '../entities/Processor';
-import { EnergyPickup } from '../entities/EnergyPickup';
+import { getStageById } from '../config/Stages';
+import type { StageConfig } from '../config/StageConfig';
+import { totalWaveEnemies } from '../config/Stages';
+import { Enemy } from '../entities/Enemy';
 import { Rover } from '../entities/Rover';
-import { Scrap } from '../entities/Scrap';
-import { CargoSystem } from '../systems/CargoSystem';
-import { DumpSystem } from '../systems/DumpSystem';
-import { EnergySystem } from '../systems/EnergySystem';
-import { MagnetSystem } from '../systems/MagnetSystem';
-import { ProgressSystem } from '../systems/ProgressSystem';
-import { RegionClearSystem } from '../systems/RegionClearSystem';
+import { CombatSystem } from '../systems/CombatSystem';
+import { HpSystem } from '../systems/HpSystem';
 import { RunState } from '../systems/RunState';
+import { WaveSpawnSystem } from '../systems/WaveSpawnSystem';
+import { WeaponSystem } from '../systems/WeaponSystem';
 import { Save } from '../save/Save';
 import { Upgrades } from '../save/Upgrades';
-import { CargoIndicator } from '../ui/CargoIndicator';
-import { CleanBar } from '../ui/CleanBar';
 import { DebugSpeedButton } from '../ui/DebugSpeedButton';
-import { EnergyBar } from '../ui/EnergyBar';
+import { HpBar } from '../ui/HpBar';
 import { Minimap } from '../ui/Minimap';
 import { PauseButton } from '../ui/PauseButton';
 import { PauseModal } from '../ui/PauseModal';
 import { VirtualJoystick } from '../ui/VirtualJoystick';
-import { TutorialOverlay } from '../ui/TutorialOverlay';
+import { TutorialOverlay, type TutorialSignals } from '../ui/TutorialOverlay';
 import { SettingsButton } from '../ui/SettingsButton';
 import { SettingsModal } from '../ui/SettingsModal';
 import { WalletBar } from '../ui/WalletBar';
+import { WaveIndicator } from '../ui/WaveIndicator';
 import { bindPlayCameras } from '../cameras/GameCameras';
 import type { ResultPayload } from './ResultScene';
 
-/** Prototype level until menu / level select exists. */
-const DEFAULT_LEVEL_ID = 1;
-
-/** Delay so the last dump tween / burst can finish before ResultScene. */
-const RESULT_DELAY_MS = 500;
+const DEFAULT_STAGE_ID = 1;
+const RESULT_DELAY_MS = 400;
 
 export class GameScene extends Scene {
-  private level!: LevelConfig;
+  private stage!: StageConfig;
   private rover!: Rover;
-  private processor!: Processor;
-  private scraps: Scrap[] = [];
-  private energyPickups: EnergyPickup[] = [];
-  private cargoSystem!: CargoSystem;
-  private magnetSystem!: MagnetSystem;
-  private dumpSystem!: DumpSystem;
-  private energySystem!: EnergySystem;
-  private progressSystem!: ProgressSystem;
-  private regionClearSystem!: RegionClearSystem;
+  private enemies: Enemy[] = [];
+  private hpSystem!: HpSystem;
+  private combatSystem!: CombatSystem;
+  private weaponSystem!: WeaponSystem;
+  private waveSpawnSystem!: WaveSpawnSystem;
   private runState!: RunState;
-  private energyBar!: EnergyBar;
-  private cleanBar!: CleanBar;
-  private cargoIndicator!: CargoIndicator;
+  private hpBar!: HpBar;
+  private waveIndicator!: WaveIndicator;
   private minimap!: Minimap;
-  private cargoCapacity: number = GameConfig.rover.capacity;
   private obstacleColliders: Geom.Rectangle[] = [];
   private joystick!: VirtualJoystick;
   private pauseModal!: PauseModal;
@@ -62,62 +49,80 @@ export class GameScene extends Scene {
   private settingsModal!: SettingsModal;
   private paused = false;
   private ending = false;
+  private roverFlashMs = 0;
+  private saveData = Save.load();
 
   public constructor() {
     super('GameScene');
   }
 
   public create(): void {
-    Audio.bind(this);
-    const save = Save.load();
-    const applied = Upgrades.getApplied(save.upgrades);
-    this.cargoCapacity = applied.capacity;
+    this.ending = false;
+    this.paused = false;
+    this.roverFlashMs = 0;
+    this.time.paused = false;
+    this.saveData = Save.load();
 
-    const levelId =
+    Audio.bind(this);
+    const save = this.saveData;
+    const roverStats = Upgrades.getAppliedRover(save.roverUpgrades);
+
+    const stageId =
       (this.registry.get('activeLevelId') as number | undefined) ??
       save.currentLevel ??
-      DEFAULT_LEVEL_ID;
-    this.registry.set('activeLevelId', levelId);
-    this.level = getLevelById(levelId);
-    this.registry.set('mapWidth', this.level.mapWidth);
-    this.registry.set('mapHeight', this.level.mapHeight);
-    this.drawEmptyMap(this.level.mapWidth, this.level.mapHeight);
+      DEFAULT_STAGE_ID;
+    this.registry.set('activeLevelId', stageId);
+    this.stage = getStageById(stageId);
+    this.registry.set('mapWidth', this.stage.mapWidth);
+    this.registry.set('mapHeight', this.stage.mapHeight);
+    this.drawMap(this.stage);
 
-    const spawnX = this.level.spawn?.x ?? this.level.mapWidth / 2;
-    const spawnY = this.level.spawn?.y ?? this.level.mapHeight / 2;
+    const spawnX = this.stage.spawn?.x ?? this.stage.mapWidth / 2;
+    const spawnY = this.stage.spawn?.y ?? this.stage.mapHeight / 2;
     this.rover = new Rover(this, spawnX, spawnY);
-    this.rover.setMoveSpeed(applied.speed);
+    this.rover.setMoveSpeed(roverStats.speed);
 
-    this.scraps = this.spawnLevelEntities(this.level);
-    this.cargoSystem = new CargoSystem(this.rover, this.scraps, applied.capacity);
-    this.cargoSystem.setProcessor(this.processor);
-    this.magnetSystem = new MagnetSystem(this.rover, this.scraps, this.cargoSystem);
-    this.magnetSystem.setMagnetRadius(applied.magnetRadius);
-    this.magnetSystem.setCanAttract(() => this.cargoSystem.canAccept());
-    this.energySystem = new EnergySystem(applied.battery);
-    this.dumpSystem = new DumpSystem(
-      this.rover,
-      this.processor,
-      this.cargoSystem,
-      this.scraps,
-    );
-    this.progressSystem = new ProgressSystem(
-      this.scraps,
-      this.cargoSystem,
-      this.dumpSystem,
-      this.scraps.length,
-    );
-    this.regionClearSystem = new RegionClearSystem(this, this.scraps);
-    this.dumpSystem.setOnProcessed(() => {
-      this.regionClearSystem.check(this.scraps);
+    this.hpSystem = new HpSystem({
+      maxHp: roverStats.maxHp,
+      armor: roverStats.armor,
     });
-    this.runState = new RunState();
+    this.combatSystem = new CombatSystem(this.rover, this.hpSystem, {
+      onEnemyKilled: () => undefined,
+      onRoverDamaged: () => {
+        this.roverFlashMs = GameConfig.survival.roverDamageFlashMs;
+      },
+      onKillShake: () => this.shakeCamera(),
+    });
 
-    this.energyBar = new EnergyBar(this);
-    this.cleanBar = new CleanBar(this);
-    this.cargoIndicator = new CargoIndicator(this);
+    this.runState = new RunState();
+    this.enemies = [];
+
+    this.waveSpawnSystem = new WaveSpawnSystem(
+      this,
+      this.stage,
+      this.rover,
+      (x, y, recipe) => {
+        const enemy = new Enemy(this, x, y, recipe);
+        this.enemies.push(enemy);
+        return enemy;
+      },
+    );
+    this.combatSystem.initRemaining(totalWaveEnemies(this.stage.wave));
+
+    this.weaponSystem = new WeaponSystem(
+      this,
+      this.rover,
+      this.combatSystem,
+      save.loadout,
+      save.weaponUpgrades,
+      this.obstacleColliders,
+    );
+
+    this.hpBar = new HpBar(this);
+    this.waveIndicator = new WaveIndicator(this);
     this.minimap = new Minimap(this);
-    this.minimap.updateMarkers(this.rover, this.scraps, this.energyPickups, this.processor);
+    this.minimap.updateEnemies(this.rover, this.enemies);
+
     const wallet = new WalletBar(this, { fixedToCamera: true, depth: 2000 });
     wallet.setCoins(save.coins);
     this.settingsModal = new SettingsModal(this);
@@ -139,9 +144,17 @@ export class GameScene extends Scene {
 
     bindPlayCameras(this, this.rover);
 
-    if (this.level.id === 1 && !save.tutorialDone) {
+    if (this.stage.id === 1 && !save.tutorialDone) {
       this.tutorial = new TutorialOverlay(this);
     }
+
+    this.events.once('shutdown', () => {
+      this.weaponSystem?.dispose();
+    });
+  }
+
+  public shutdown(): void {
+    this.weaponSystem?.dispose();
   }
 
   public update(_time: number, delta: number): void {
@@ -152,22 +165,39 @@ export class GameScene extends Scene {
     const axis = this.joystick.getAxis();
     this.rover.setJoystickInput(axis.x, axis.y);
     this.rover.updateRover(delta);
-    this.rover.resolveSolidRect(this.processor.collider);
     for (const collider of this.obstacleColliders) {
       this.rover.resolveSolidRect(collider);
     }
-    this.magnetSystem.update(delta);
-    this.cargoSystem.update(delta);
-    this.dumpSystem.update(delta);
-    this.energySystem.update(delta, this.rover.isMoving);
-    this.collectEnergyPickups();
 
-    this.energyBar.setRatio(this.energySystem.ratio);
-    this.cleanBar.setRatio(this.progressSystem.cleanupRatio);
-    this.cargoIndicator.setCargo(this.cargoSystem.length, this.cargoCapacity);
-    this.minimap.updateMarkers(this.rover, this.scraps, this.energyPickups, this.processor);
+    this.hpSystem.update(delta);
+    this.waveSpawnSystem.update(delta);
+
+    for (const enemy of this.enemies) {
+      if (enemy.active) {
+        enemy.updateChase(
+          delta,
+          this.rover.x,
+          this.rover.y,
+          this.stage.mapWidth,
+          this.stage.mapHeight,
+        );
+      }
+    }
+
+    this.combatSystem.updateContact(this.enemies);
+    this.weaponSystem.update(
+      delta,
+      this.enemies,
+      this.stage.mapWidth,
+      this.stage.mapHeight,
+      this.saveData.weaponUpgrades,
+    );
+
+    this.hpBar.setRatio(this.hpSystem.ratio);
+    this.waveIndicator.setRemaining(this.combatSystem.remainingEnemies);
+    this.minimap.updateEnemies(this.rover, this.enemies);
     this.syncTutorial();
-
+    this.updateRoverFlash(delta);
     this.evaluateRunEnd();
   }
 
@@ -175,12 +205,32 @@ export class GameScene extends Scene {
     if (!this.tutorial?.isActive) {
       return;
     }
-
-    this.tutorial.sync({
+    const signals: TutorialSignals = {
       moving: this.rover.isMoving,
-      attracted: this.scraps.some((scrap) => scrap.state === 'Attracted'),
-      queued: this.cargoSystem.length > 0,
-      dumped: this.dumpSystem.processedTotal > 0,
+      fired: this.combatSystem.killCount > 0,
+      damaged: this.roverFlashMs > 0,
+      cleared: this.combatSystem.remainingEnemies === 0 && this.waveSpawnSystem.waveFullySpawned,
+    };
+    this.tutorial.sync(signals);
+  }
+
+  private updateRoverFlash(delta: number): void {
+    if (this.roverFlashMs <= 0) {
+      return;
+    }
+    this.roverFlashMs = Math.max(0, this.roverFlashMs - delta);
+    this.rover.setAlpha(this.roverFlashMs > 0 ? 0.65 : 1);
+  }
+
+  private shakeCamera(): void {
+    const cam = this.cameras.main;
+    const intensity = GameConfig.survival.killShakeIntensity;
+    this.tweens.add({
+      targets: cam,
+      scrollX: cam.scrollX + intensity * 40,
+      duration: 40,
+      yoyo: true,
+      repeat: 2,
     });
   }
 
@@ -221,13 +271,16 @@ export class GameScene extends Scene {
       return;
     }
 
-    if (this.progressSystem.isComplete) {
-      this.endRun('Won');
+    if (this.hpSystem.isDead) {
+      this.endRun('Lost');
       return;
     }
 
-    if (this.energySystem.isEmpty) {
-      this.endRun('Lost');
+    if (
+      this.combatSystem.remainingEnemies === 0 &&
+      this.waveSpawnSystem.waveFullySpawned
+    ) {
+      this.endRun('Won');
     }
   }
 
@@ -239,72 +292,44 @@ export class GameScene extends Scene {
 
     if (outcome === 'Won') {
       this.runState.win();
+      Audio.play('win');
     } else {
       this.runState.lose();
+      Audio.play('lose');
     }
 
     this.rover.setJoystickInput(0, 0);
     this.joystick.release();
     this.joystick.setCaptureEnabled(false);
 
+    const stageBonus =
+      GameConfig.survival.stageCoinBonus[this.stage.id - 1] ?? 10;
+    const coinsEarned =
+      outcome === 'Won'
+        ? this.combatSystem.killCount * GameConfig.coins.perKill + stageBonus
+        : 0;
+
     const payload: ResultPayload = {
       outcome,
-      cleanPercentage: this.progressSystem.getCleanPercentage(),
-      levelId: this.level.id,
-      coinsEarned:
-        outcome === 'Won'
-          ? this.progressSystem.creditedScrapCount * GameConfig.coins.perScrap
-          : 0,
+      stageId: this.stage.id,
+      kills: this.combatSystem.killCount,
+      coinsEarned,
     };
     this.registry.set('resultPayload', payload);
     this.registry.set('resultSettled', false);
+    this.time.paused = false;
+    this.tweens.resumeAll();
     this.time.delayedCall(RESULT_DELAY_MS, () => {
       this.scene.start('ResultScene');
     });
   }
 
-  private collectEnergyPickups(): void {
-    const bonus = this.energySystem.maxEnergy * GameConfig.energy.pickupBonusRatio;
-    for (const pickup of this.energyPickups) {
-      if (pickup.collected) {
-        continue;
-      }
-      if (pickup.overlapsRover(this.rover.x, this.rover.y)) {
-        pickup.collected = true;
-        this.energySystem.addEnergy(bonus);
-        pickup.destroy();
-      }
-    }
-  }
-
-  /** Wire entities from LevelConfig — no attraction or dump math here. */
-  private spawnLevelEntities(level: LevelConfig): Scrap[] {
-    this.processor = new Processor(this, level.processor.x, level.processor.y);
-    this.spawnObstacles(level);
-
-    const scraps: Scrap[] = [];
-    for (const scrap of level.scraps) {
-      scraps.push(
-        new Scrap(this, scrap.x, scrap.y, scrap.color, scrap.size, scrap.regionId ?? 0),
-      );
-    }
-
-    this.energyPickups = [];
-    for (const powerUp of level.powerUps ?? []) {
-      if (powerUp.type === 'energy') {
-        this.energyPickups.push(new EnergyPickup(this, powerUp.x, powerUp.y));
-      }
-    }
-    return scraps;
-  }
-
-  private spawnObstacles(level: LevelConfig): void {
+  private spawnObstacles(stage: StageConfig): void {
     this.obstacleColliders = [];
-    for (const obstacle of level.obstacles ?? []) {
+    for (const obstacle of stage.obstacles) {
       this.obstacleColliders.push(
         new Geom.Rectangle(obstacle.x, obstacle.y, obstacle.width, obstacle.height),
       );
-
       const graphics = this.add.graphics();
       graphics.fillStyle(0x3d3d4a, 0.92);
       graphics.fillRoundedRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height, 8);
@@ -313,13 +338,13 @@ export class GameScene extends Scene {
     }
   }
 
-  private drawEmptyMap(width: number, height: number): void {
+  private drawMap(stage: StageConfig): void {
     const { mapFill } = GameConfig.colors;
-
-    this.add.rectangle(width / 2, height / 2, width, height, mapFill);
+    this.add.rectangle(stage.mapWidth / 2, stage.mapHeight / 2, stage.mapWidth, stage.mapHeight, mapFill);
     this.add
-      .image(0, 0, 'scenario1')
+      .image(0, 0, stage.backgroundKey)
       .setOrigin(0, 0)
-      .setDisplaySize(width, height);
+      .setDisplaySize(stage.mapWidth, stage.mapHeight);
+    this.spawnObstacles(stage);
   }
 }

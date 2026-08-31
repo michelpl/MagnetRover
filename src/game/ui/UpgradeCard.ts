@@ -1,66 +1,57 @@
 import { GameObjects, Geom, Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
+import { getWeaponDefinition, type WeaponId } from '../config/Weapons';
 import { Audio } from '../audio/Audio';
 import { Haptics } from '../audio/Haptics';
 import { Save, type SaveData } from '../save/Save';
-import { Upgrades, type UpgradeLine } from '../save/Upgrades';
+import { Upgrades, type RoverUpgradeLine } from '../save/Upgrades';
 import { drawNavyPanel } from './navyPanel';
 import { setContainerInteractive } from './setContainerInteractive';
 
-/** One garage upgrade row: icon, current → next, pips, buy. */
+export type UpgradeCardKind =
+  | { type: 'rover'; line: RoverUpgradeLine }
+  | { type: 'weapon'; weaponId: WeaponId };
+
+/** One garage upgrade row for rover stats or weapon damage tiers. */
 export class UpgradeCard {
   private readonly scene: Scene;
-  private readonly line: UpgradeLine;
+  private readonly kind: UpgradeCardKind;
   private readonly root: GameObjects.Container;
   private readonly baseX: number;
-  private readonly levelText: GameObjects.Text;
+  private readonly titleText: GameObjects.Text;
   private readonly valueText: GameObjects.Text;
   private readonly costText: GameObjects.Text;
   private readonly plusText: GameObjects.Text;
-  private readonly coinIcon: GameObjects.Image;
   private readonly buyGfx: GameObjects.Graphics;
-  private readonly progressGfx: GameObjects.Graphics;
   private shaking = false;
 
-  public constructor(scene: Scene, x: number, y: number, line: UpgradeLine, onChange: () => void) {
+  public constructor(
+    scene: Scene,
+    x: number,
+    y: number,
+    kind: UpgradeCardKind,
+    onChange: () => void,
+  ) {
     this.scene = scene;
-    this.line = line;
+    this.kind = kind;
     this.baseX = x;
 
-    const { cardWidth, cardHeight, cardRadius, iconSize, buySize } = GameConfig.garage;
+    const { cardWidth, cardHeight, cardRadius, buySize } = GameConfig.garage;
     const panel = scene.add.graphics();
     drawNavyPanel(panel, cardWidth, cardHeight, cardRadius);
 
-    const iconX = 28 + iconSize / 2;
-    const iconName = lineIconFrame(line);
-    const icon = scene.add.image(iconX, cardHeight / 2, 'garage-icons', iconName);
-    icon.setDisplaySize(iconSize, iconSize);
-
-    const textX = 28 + iconSize + 20;
-    const title = scene.add
-      .text(textX, 24, upgradeTitle(line), {
+    this.titleText = scene.add
+      .text(28, 24, this.cardTitle(), {
         fontFamily: GameConfig.ui.fontFamily,
         fontSize: '28px',
         fontStyle: 'bold',
         color: '#f5f8fd',
       })
-      .setOrigin(0, 0)
-      .setShadow(0, 1, '#000000', 1, true, true);
-
-    this.levelText = scene.add
-      .text(textX, 58, '', {
-        fontFamily: GameConfig.ui.fontFamily,
-        fontSize: '22px',
-        fontStyle: 'bold',
-        color: '#caff00',
-      })
       .setOrigin(0, 0);
 
-    const costAreaWidth = 166;
-    const buyX = cardWidth - 28 - costAreaWidth - buySize;
-    const buyY = (cardHeight - buySize) / 2;
+    const buyX = cardWidth - 28 - 166 - buySize;
     this.valueText = scene.add
-      .text(buyX - 20, 30, '', {
+      .text(buyX - 20, 58, '', {
         fontFamily: GameConfig.ui.fontFamily,
         fontSize: '22px',
         fontStyle: 'bold',
@@ -68,19 +59,15 @@ export class UpgradeCard {
       })
       .setOrigin(1, 0);
 
-    this.progressGfx = scene.add.graphics();
     this.buyGfx = scene.add.graphics();
     this.plusText = scene.add
-      .text(buyX + buySize / 2, buyY + buySize / 2 - 3, '+', {
+      .text(buyX + buySize / 2, (cardHeight - buySize) / 2 + buySize / 2 - 3, '+', {
         fontFamily: GameConfig.ui.fontFamily,
         fontSize: '52px',
         fontStyle: 'bold',
         color: '#ffffff',
       })
-      .setOrigin(0.5)
-      .setShadow(0, 3, '#0a3c16', 2, true, true);
-    this.coinIcon = scene.add.image(buyX + buySize + 24, cardHeight / 2, 'iconset', 'coin');
-    this.coinIcon.setDisplaySize(32, 32);
+      .setOrigin(0.5);
     this.costText = scene.add
       .text(buyX + buySize + 48, cardHeight / 2, '', {
         fontFamily: GameConfig.ui.fontFamily,
@@ -92,14 +79,10 @@ export class UpgradeCard {
 
     this.root = scene.add.container(x, y, [
       panel,
-      icon,
-      title,
-      this.levelText,
+      this.titleText,
       this.valueText,
-      this.progressGfx,
       this.buyGfx,
       this.plusText,
-      this.coinIcon,
       this.costText,
     ]);
     this.root.setSize(cardWidth, cardHeight);
@@ -109,38 +92,28 @@ export class UpgradeCard {
       Geom.Rectangle.Contains,
     );
     this.root.setDepth(1000);
-
-    this.root.on('pointerup', () => {
-      this.tryPurchase(onChange);
-    });
-
+    this.root.on('pointerup', () => this.tryPurchase(onChange));
     this.refresh(Save.load());
   }
 
   public refresh(data: SaveData): void {
-    const current = Upgrades.getApplied(data.upgrades)[this.line];
-    const cost = Upgrades.nextCost(this.line, data.upgrades);
-    const maxed = Upgrades.isMaxed(this.line, data.upgrades);
-    const affordable = cost !== null && data.coins >= cost && Upgrades.isEnabled();
-    const level = data.upgrades[this.line] + 1;
-    const values = GameConfig.upgrades[this.line].values;
-    const max = values[values.length - 1];
-    if (max === undefined) {
-      throw new Error(`Missing maximum value for ${this.line} upgrade`);
-    }
+    const cost = this.nextCost(data);
+    const maxed = cost === null;
+    const affordable = cost !== null && data.coins >= cost;
 
-    this.levelText.setText(`LEVEL ${level}`);
-    this.valueText.setText(`${current}/${max}`);
-    this.drawProgress(level, GameConfig.upgrades[this.line].values.length);
+    this.valueText.setText(this.valueLabel(data));
     this.drawBuy(maxed, affordable, cost);
   }
 
   private tryPurchase(onChange: () => void): void {
     const data = Save.load();
-    if (Upgrades.isMaxed(this.line, data.upgrades)) {
+    if (this.nextCost(data) === null) {
       return;
     }
-    const bought = Upgrades.purchase(this.line);
+    const bought =
+      this.kind.type === 'rover'
+        ? Upgrades.purchaseRover(this.kind.line)
+        : Upgrades.purchaseWeapon(this.kind.weaponId);
     if (!bought) {
       this.shake();
       return;
@@ -176,19 +149,44 @@ export class UpgradeCard {
     });
   }
 
-  private drawProgress(level: number, levelCount: number): void {
-    const { cardWidth, iconSize, buySize } = GameConfig.garage;
-    const x = 28 + iconSize + 20;
-    const buyX = cardWidth - 28 - 166 - buySize;
-    const width = buyX - x - 28;
-    const height = 16;
-    const y = 92;
-    const ratio = Math.max(0, Math.min(level / levelCount, 1));
-    this.progressGfx.clear();
-    this.progressGfx.fillStyle(0x02142c, 0.95);
-    this.progressGfx.fillRoundedRect(x, y, width, height, height / 2);
-    this.progressGfx.fillStyle(0x8ff000, 1);
-    this.progressGfx.fillRoundedRect(x, y, width * ratio, height, height / 2);
+  private nextCost(data: SaveData): number | null {
+    if (this.kind.type === 'rover') {
+      return Upgrades.roverNextCost(this.kind.line, data.roverUpgrades);
+    }
+    return Upgrades.weaponNextCost(this.kind.weaponId, data);
+  }
+
+  private valueLabel(data: SaveData): string {
+    if (this.kind.type === 'rover') {
+      const applied = Upgrades.getAppliedRover(data.roverUpgrades);
+      if (this.kind.line === 'hp') {
+        return String(applied.maxHp);
+      }
+      if (this.kind.line === 'speed') {
+        return String(applied.speed);
+      }
+      return String(applied.armor);
+    }
+    const tier = Upgrades.weaponTier(this.kind.weaponId, data);
+    return `Tier ${tier}`;
+  }
+
+  private cardTitle(): string {
+    if (this.kind.type === 'rover') {
+      switch (this.kind.line) {
+        case 'hp':
+          return 'Rover HP';
+        case 'speed':
+          return 'Speed';
+        case 'armor':
+          return 'Armor';
+        default: {
+          const _exhaustive: never = this.kind.line;
+          return _exhaustive;
+        }
+      }
+    }
+    return getWeaponDefinition(this.kind.weaponId).name;
   }
 
   private drawBuy(maxed: boolean, affordable: boolean, cost: number | null): void {
@@ -199,56 +197,14 @@ export class UpgradeCard {
     this.buyGfx.clear();
     this.buyGfx.fillStyle(fill, 1);
     this.buyGfx.fillRoundedRect(buyX, buyY, buySize, buySize, Math.min(16, cardRadius));
-    this.buyGfx.fillStyle(maxed || !affordable ? 0x304861 : 0x337f18, 0.8);
-    this.buyGfx.fillRoundedRect(buyX + 4, buyY + buySize * 0.58, buySize - 8, buySize * 0.38, 10);
-    this.buyGfx.lineStyle(3, maxed || !affordable ? 0x5f7890 : 0x9bea58, 0.95);
-    this.buyGfx.strokeRoundedRect(buyX, buyY, buySize, buySize, Math.min(16, cardRadius));
-
     this.plusText.setVisible(!maxed);
     this.plusText.setAlpha(affordable ? 1 : 0.4);
-    this.coinIcon.setVisible(!maxed);
     if (maxed) {
       this.costText.setText('MAX');
       this.costText.setColor('#a9bbd4');
-      this.costText.setX(buyX + buySize + 20);
     } else {
       this.costText.setText(String(cost ?? 0));
       this.costText.setColor(affordable ? '#f5f8fd' : '#a9bbd4');
-      this.costText.setX(buyX + buySize + 48);
-    }
-  }
-}
-
-function lineIconFrame(line: UpgradeLine): string {
-  switch (line) {
-    case 'capacity':
-      return GameConfig.garage.lineIcons.capacity;
-    case 'battery':
-      return GameConfig.garage.lineIcons.battery;
-    case 'speed':
-      return GameConfig.garage.lineIcons.speed;
-    case 'magnetRadius':
-      return GameConfig.garage.lineIcons.magnetRadius;
-    default: {
-      const _exhaustive: never = line;
-      return _exhaustive;
-    }
-  }
-}
-
-function upgradeTitle(line: UpgradeLine): string {
-  switch (line) {
-    case 'capacity':
-      return 'Load';
-    case 'battery':
-      return 'Battery';
-    case 'speed':
-      return 'Speed';
-    case 'magnetRadius':
-      return 'Range';
-    default: {
-      const _exhaustive: never = line;
-      return _exhaustive;
     }
   }
 }

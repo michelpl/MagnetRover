@@ -1,7 +1,7 @@
 import { Scene } from 'phaser';
+import { WEAPON_IDS } from '../config/Weapons';
 import { GameConfig } from '../config/GameConfig';
 import { Save } from '../save/Save';
-import { type UpgradeLine } from '../save/Upgrades';
 import { HubBar } from '../ui/HubBar';
 import { addCoverBackground } from '../ui/hubBackground';
 import { UpgradeCard } from '../ui/UpgradeCard';
@@ -10,9 +10,7 @@ import { SettingsButton } from '../ui/SettingsButton';
 import { SettingsModal } from '../ui/SettingsModal';
 import { viewSize } from '../ui/viewSize';
 
-const UPGRADE_LINES: readonly UpgradeLine[] = ['capacity', 'battery', 'speed', 'magnetRadius'];
-
-/** Spend coins on rover upgrades — hub Garage tab. */
+/** Spend coins on rover and weapon upgrades — hub Garage tab. */
 export class GarageScene extends Scene {
   private wallet!: WalletBar;
   private cards: UpgradeCard[] = [];
@@ -30,15 +28,19 @@ export class GarageScene extends Scene {
     this.wallet = new WalletBar(this);
     const settingsModal = new SettingsModal(this);
     new SettingsButton(this, false, () => settingsModal.show());
+
     const cardX = (width - cardWidth) / 2;
-    this.cards = UPGRADE_LINES.map(
-      (line, index) =>
-        new UpgradeCard(
-          this,
-          cardX,
-          cardsTop + index * (cardHeight + cardGap),
-          line,
-          () => this.refresh(),
+    const lines = [
+      { type: 'rover' as const, line: 'hp' as const },
+      { type: 'rover' as const, line: 'speed' as const },
+      { type: 'rover' as const, line: 'armor' as const },
+      ...WEAPON_IDS.map((weaponId) => ({ type: 'weapon' as const, weaponId })),
+    ];
+
+    this.cards = lines.map(
+      (kind, index) =>
+        new UpgradeCard(this, cardX, cardsTop + index * (cardHeight + cardGap), kind, () =>
+          this.refresh(),
         ),
     );
 
