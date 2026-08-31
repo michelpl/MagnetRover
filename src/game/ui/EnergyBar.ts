@@ -1,5 +1,7 @@
 import { GameObjects, Scene } from 'phaser';
+import { ignoreWorldCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
+import { bindViewResize, safeInsets, viewSize } from './viewSize';
 
 /** Camera-fixed energy panel with eight visual charge units. */
 export class EnergyBar {
@@ -10,10 +12,7 @@ export class EnergyBar {
   private percentage = -1;
 
   public constructor(scene: Scene) {
-    const { marginX, marginBottom, energyPanel } = GameConfig.hud;
-
-    const x = marginX;
-    const y = GameConfig.viewport.height - marginBottom - energyPanel.height;
+    const { energyPanel } = GameConfig.hud;
 
     const background = scene.add
       .image(0, 0, 'energy-panel')
@@ -39,10 +38,21 @@ export class EnergyBar {
       })
       .setOrigin(0.5, 0.5);
 
-    this.root = scene.add.container(x, y, [background, ...this.units, this.percentageLabel]);
+    this.root = scene.add.container(0, 0, [background, ...this.units, this.percentageLabel]);
     this.root.setScrollFactor(0);
     this.root.setDepth(2000);
+    ignoreWorldCamera(scene, this.root);
     this.setRatio(1);
+    bindViewResize(scene, () => this.layout(scene));
+  }
+
+  private layout(scene: Scene): void {
+    const { marginX, marginBottom, energyPanel } = GameConfig.hud;
+    const inset = safeInsets(scene);
+    this.root.setPosition(
+      inset.left + marginX,
+      viewSize(scene).height - inset.bottom - marginBottom - energyPanel.height,
+    );
   }
 
   public setRatio(ratio: number): void {

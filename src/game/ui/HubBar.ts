@@ -1,6 +1,7 @@
 import { GameObjects, Geom, Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
 import { setContainerInteractive } from './setContainerInteractive';
+import { bindViewResize, safeInsets, viewSize } from './viewSize';
 
 export type HubTab = 'shop' | 'stages' | 'garage';
 
@@ -27,9 +28,8 @@ const ACTIVE_ALPHA = 1;
  */
 export class HubBar extends GameObjects.Container {
   public constructor(scene: Scene, activeTab: HubTab) {
-    const { width, height } = GameConfig.viewport;
-    const { marginBottom, buttonSize, spacing } = GameConfig.hub;
-    super(scene, width / 2, height - marginBottom);
+    const { buttonSize, spacing } = GameConfig.hub;
+    super(scene, 0, 0);
 
     const startX = -((TABS.length - 1) * spacing) / 2;
     TABS.forEach((tab, column) => {
@@ -40,6 +40,14 @@ export class HubBar extends GameObjects.Container {
     this.setDepth(3000);
     scene.add.existing(this);
     scene.children.bringToTop(this);
+    bindViewResize(scene, () => this.layout());
+  }
+
+  private layout(): void {
+    const { width, height } = viewSize(this.scene);
+    const { marginBottom } = GameConfig.hub;
+    const inset = safeInsets(this.scene);
+    this.setPosition(width / 2, height - inset.bottom - marginBottom);
   }
 
   private buildButton(

@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "sprites:rover": "blender --background --python tools/blender/render_rover_sprites.py",
     "android:sync": "npm run build && npx cap sync android",
-    "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",
+    "android:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/android/build-apk.ps1",
     "android:aab": "npm run android:sync && cd android && gradlew.bat bundleRelease"
   },
   "dependencies": {

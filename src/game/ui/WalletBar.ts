@@ -1,14 +1,18 @@
 import { GameObjects, Scene } from 'phaser';
+import { ignoreWorldCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
 import { drawNavyPanel } from './navyPanel';
+import { bindViewResize, safeInsets, viewSize } from './viewSize';
 
 /** Coin total for hub screens (garage wallet). */
 export class WalletBar {
   private readonly coinsText: GameObjects.Text;
+  private readonly root: GameObjects.Container;
+  private readonly options: WalletBarOptions;
 
   public constructor(scene: Scene, options: WalletBarOptions = {}) {
-    const { width } = GameConfig.viewport;
-    const { marginTop, walletWidth, walletHeight, walletRadius, iconSize } = GameConfig.garage;
+    this.options = options;
+    const { walletWidth, walletHeight, walletRadius, iconSize } = GameConfig.garage;
 
     const panel = scene.add.graphics();
     drawNavyPanel(panel, walletWidth, walletHeight, walletRadius);
@@ -35,17 +39,26 @@ export class WalletBar {
     );
     plus.setDisplaySize(48, 48);
 
-    const x = options.x ?? (width - walletWidth) / 2;
-    const y = options.y ?? marginTop;
-    const root = scene.add.container(x, y, [panel, coin, this.coinsText, plus]);
-    root.setDepth(options.depth ?? 1000);
+    this.root = scene.add.container(0, 0, [panel, coin, this.coinsText, plus]);
+    this.root.setDepth(options.depth ?? 1000);
     if (options.fixedToCamera) {
-      root.setScrollFactor(0);
+      this.root.setScrollFactor(0);
+      ignoreWorldCamera(scene, this.root);
     }
+    bindViewResize(scene, () => this.layout(scene));
   }
 
   public setCoins(amount: number): void {
     this.coinsText.setText(String(amount));
+  }
+
+  private layout(scene: Scene): void {
+    const { width } = viewSize(scene);
+    const { marginTop, walletWidth } = GameConfig.garage;
+    const inset = safeInsets(scene);
+    const x = this.options.x ?? (width - walletWidth) / 2;
+    const y = this.options.y ?? inset.top + marginTop;
+    this.root.setPosition(x, y);
   }
 }
 

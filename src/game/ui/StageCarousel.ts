@@ -3,6 +3,7 @@ import { GameConfig } from '../config/GameConfig';
 import { isLevelUnlocked, levels } from '../config/Levels';
 import { addGradientText } from './gradientText';
 import { setContainerInteractive } from './setContainerInteractive';
+import { viewSize } from './viewSize';
 
 const SLIDE_MS = 250;
 export const STAGE_CARD_WIDTH = 520;
@@ -52,7 +53,7 @@ export class StageCarousel {
   public constructor(scene: Scene, currentLevel: number, centerY: number) {
     this.scene = scene;
     this.currentLevel = currentLevel;
-    this.spacing = GameConfig.viewport.width;
+    this.spacing = viewSize(scene).width;
 
     const startId = Math.min(Math.max(currentLevel, 1), levels.length);
     this.selectedIndex = Math.max(
@@ -60,7 +61,7 @@ export class StageCarousel {
       levels.findIndex((level) => level.id === startId),
     );
 
-    const { width } = GameConfig.viewport;
+    const { width } = viewSize(scene);
     const centerX = width / 2;
 
     this.track = scene.add.container(centerX - this.selectedIndex * this.spacing, centerY);
@@ -192,7 +193,7 @@ export class StageCarousel {
     this.sliding = true;
     this.refreshArrows();
     this.onSelectionChange?.();
-    const { width } = GameConfig.viewport;
+    const { width } = viewSize(this.scene);
     this.scene.tweens.add({
       targets: this.track,
       x: width / 2 - this.selectedIndex * this.spacing,

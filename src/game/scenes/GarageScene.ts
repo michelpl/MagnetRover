@@ -8,6 +8,7 @@ import { UpgradeCard } from '../ui/UpgradeCard';
 import { WalletBar } from '../ui/WalletBar';
 import { SettingsButton } from '../ui/SettingsButton';
 import { SettingsModal } from '../ui/SettingsModal';
+import { viewSize } from '../ui/viewSize';
 
 const UPGRADE_LINES: readonly UpgradeLine[] = ['capacity', 'battery', 'speed', 'magnetRadius'];
 
@@ -21,7 +22,7 @@ export class GarageScene extends Scene {
   }
 
   public create(): void {
-    const { width } = GameConfig.viewport;
+    const { width } = viewSize(this);
     const { cardsTop, cardWidth, cardHeight, cardGap } = GameConfig.garage;
 
     addCoverBackground(this, 'garage-bg');

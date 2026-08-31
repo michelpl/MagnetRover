@@ -121,14 +121,14 @@ export const GameConfig = {
     },
   },
   joystick: {
-    baseRadius: 90,
-    thumbRadius: 36,
-    /** Distance from viewport bottom to joystick center. */
-    marginBottom: 160,
+    baseRadius: 110,
+    thumbRadius: 44,
+    /** Distance from viewport bottom to idle stick center. */
+    marginBottom: 200,
     /** Fraction of base radius that reads as zero before analog ramp. */
     deadzone: 0.12,
     /** Bottom fraction of the viewport that can start a stick drag. */
-    captureHeightRatio: 0.4,
+    captureHeightRatio: 0.55,
     /** Active base / thumb fill alpha. */
     opacity: 0.45,
     /** Faint base while idle so the control stays discoverable. */
@@ -154,20 +154,20 @@ export const GameConfig = {
    * Icon PNGs are 440×440; buttonSize is the on-screen display width.
    */
   hub: {
-    marginBottom: 140,
+    marginBottom: 168,
     buttonSize: 220,
     spacing: 360,
     hitRadius: 92,
     iconSourceSize: 440,
   },
   /**
-   * Garage (upgrade) tab. Last card must stay above ~y 1660 so it
-   * does not overlap HubBar hit circles (center at height - marginBottom).
+   * Garage (upgrade) tab. Last card must stay above the HubBar
+   * (center at height - marginBottom).
    * Icon frames are pixel crops of `assets/ui/iconset.png` (irregular grid).
    */
   garage: {
     marginX: 48,
-    marginTop: 40,
+    marginTop: 88,
     walletWidth: 420,
     walletHeight: 84,
     walletRadius: 16,
@@ -211,7 +211,7 @@ export const GameConfig = {
   },
   /** Shared currency and future-settings controls on game and hub screens. */
   topControls: {
-    marginTop: 40,
+    marginTop: 88,
     gearSize: 84,
     gearMarginRight: 48,
     pauseGapBelowGear: 12,
@@ -228,8 +228,8 @@ export const GameConfig = {
   /** Camera-fixed in-run HUD — keep clear of bottom joystick. */
   hud: {
     marginX: 48,
-    marginTop: 48,
-    marginBottom: 48,
+    marginTop: 88,
+    marginBottom: 96,
     /** Camera-fixed lower-left battery panel. Artwork is the source of its chrome. */
     energyPanel: {
       width: 260,
@@ -253,7 +253,7 @@ export const GameConfig = {
     cleanPanelHeight: 55,
     cleanPanelRadius: 15,
     /** Leaves room for the shared wallet at the top of the in-run HUD. */
-    cleanPanelMarginTop: 148,
+    cleanPanelMarginTop: 196,
     cleanTrackX: 16,
     cleanTrackY: 31,
     cleanTrackWidth: 190,

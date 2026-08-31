@@ -1,6 +1,7 @@
 import { Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
 import { HubBar } from '../ui/HubBar';
+import { viewSize } from '../ui/viewSize';
 
 /** Placeholder shop tab — no purchases yet. */
 export class ShopScene extends Scene {
@@ -9,7 +10,7 @@ export class ShopScene extends Scene {
   }
 
   public create(): void {
-    const { width, height } = GameConfig.viewport;
+    const { width, height } = viewSize(this);
     this.add.rectangle(width / 2, height / 2, width, height, GameConfig.colors.background);
     this.add
       .text(width / 2, height / 2 - 80, 'Shop', {

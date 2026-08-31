@@ -36,7 +36,7 @@ Keep game code under `src/game/` as in MVP §23:
 - Use generated Graphics/Container placeholders until art exists.
 - Do not add Arcade Physics (or any physics plugin) unless a later task needs it. Attract cubes to the rear magnet and follow the cargo queue with interpolation.
 - Collectibles are metallic cubes (color + size visual only). Carried cubes form a malleable queue behind the rear magnet — not fixed cargo slots around the rover.
-- Scale is portrait 1080×1920 with `Scale.FIT`.
+- Scale is portrait 1080×1920 with `Scale.EXPAND` so the canvas fills the parent; HUD uses `viewSize` (live `scene.scale` size).
 - Keep `update(time, delta)` cheap: modest Android devices are the target.
 
 ## Project premises
