@@ -34,26 +34,34 @@ Fitted `ortho_scale` from the last rover render: **2.713699**.
 
 Meshy rest pose has the green top panel along **+X** and the face/eyes along **-X**. The script adds `MESH_FORWARD_OFFSET_DEG = -90` so frame 0 (north) points the eyes to **+Y** (top of the PNG).
 
-## 8-direction yaw (rover)
+## 16-direction yaw (rover)
 
 Phaser `Rover.rotation === 0` faces up (negative world Y). Frame index:
 
-`frame = round(wrap(rotation) / (PI / 4)) % 8`
+`frame = round(wrap(rotation) / (PI / 8)) % 16`
 
 Yaw is **clockwise** from north (negative Blender Z) so it matches Phaser (`Y` down, `rotation` clockwise).
 
 | Index | Yaw ° (clockwise from north) | Facing | File |
 | --- | --- | --- | --- |
 | 0 | 0 | N | `rover_n.png` |
-| 1 | 45 | NE | `rover_ne.png` |
-| 2 | 90 | E | `rover_e.png` |
-| 3 | 135 | SE | `rover_se.png` |
-| 4 | 180 | S | `rover_s.png` |
-| 5 | 225 | SW | `rover_sw.png` |
-| 6 | 270 | W | `rover_w.png` |
-| 7 | 315 | NW | `rover_nw.png` |
+| 1 | 22.5 | NNE | `rover_nne.png` |
+| 2 | 45 | NE | `rover_ne.png` |
+| 3 | 67.5 | ENE | `rover_ene.png` |
+| 4 | 90 | E | `rover_e.png` |
+| 5 | 112.5 | ESE | `rover_ese.png` |
+| 6 | 135 | SE | `rover_se.png` |
+| 7 | 157.5 | SSE | `rover_sse.png` |
+| 8 | 180 | S | `rover_s.png` |
+| 9 | 202.5 | SSW | `rover_ssw.png` |
+| 10 | 225 | SW | `rover_sw.png` |
+| 11 | 247.5 | WSW | `rover_wsw.png` |
+| 12 | 270 | W | `rover_w.png` |
+| 13 | 292.5 | WNW | `rover_wnw.png` |
+| 14 | 315 | NW | `rover_nw.png` |
+| 15 | 337.5 | NNW | `rover_nnw.png` |
 
-Packed strip: `public/assets/sprites/rover/rover.png` (8 × 1, 256 px cells).
+Packed strip: `public/assets/sprites/rover/rover.png` (16 × 1, 256 px cells).
 
 ## Import
 
@@ -65,4 +73,43 @@ Meshy FBX is treated as Unity-style Y-up: Blender import `axis_forward = -Z`, `a
 blender --background --python tools/blender/render_rover_sprites.py
 ```
 
+If Blender is not installed, build a 16-dir sheet from the existing 8-dir PNGs (blended intermediates):
+
+```text
+python tools/blender/pack_rover_16_from_8.py
+```
+
 Source mesh: `ConceptArt/Meshy_AI_Lunar_Rover_Mini_0826181139_texture_fbx/`.
+
+## Weapons (base + laser cannon)
+
+Same camera, lights, and **fixed** `ortho_scale` **2.713699** as the rover (do not auto-fit). Disc and cannon are scaled in Blender against the rover FBX (`BASE_DIAMETER_FRAC` / `CANNON_SIZE_FRAC` in the render script).
+
+```text
+blender --background --python tools/blender/render_weapon_sprites.py
+```
+
+Sources: `ConceptArt/Weapons/WeaponBase/`, `ConceptArt/Weapons/LaserCannon/`.
+
+### Weapon base (16-dir)
+
+Same yaw table as the rover. Packed strip: `public/assets/sprites/weapons/weapon_base.png` (16 × 1, 256 px cells).
+
+Phaser parents this sprite to the hull layer and uses the same frame as the rover hull.
+
+### Laser cannon (32-dir)
+
+Yaw step **11.25°** clockwise from north. Packed grid: `public/assets/sprites/weapons/laser_cannon.png` (8 × 4, 256 px cells, 2048 × 1024). Phaser frame index:
+
+`frame = round(wrap(worldAngle) / (PI / 16)) % 32`
+
+| Index | Yaw ° | File |
+| --- | --- | --- |
+| 0 | 0 | `laser_cannon_00.png` |
+| 8 | 90 | `laser_cannon_08.png` |
+| 16 | 180 | `laser_cannon_16.png` |
+| 24 | 270 | `laser_cannon_24.png` |
+
+Gameplay still clamps aim to a 120° forward cone; the extra frames are for a later 360° turret.
+
+Debug composite (not used in-game): `public/assets/sprites/weapons/_debug/rover_base_cannon_se.png`.

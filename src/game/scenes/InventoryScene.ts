@@ -8,7 +8,7 @@ import { SettingsModal } from '../ui/SettingsModal';
 import { WalletBar } from '../ui/WalletBar';
 import { viewSize } from '../ui/viewSize';
 
-/** Equip up to four owned weapons before a run. */
+/** Loadout screen — laser cannon only for now. */
 export class InventoryScene extends Scene {
   private wallet!: WalletBar;
 

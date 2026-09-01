@@ -1,5 +1,18 @@
 import { GameObjects, Geom, Input, Math as PhaserMath, Scene } from 'phaser';
+import {
+  clampToMap,
+  hullRadius,
+  resolveCircleVsRect,
+} from '../collision/solidBody';
 import { GameConfig } from '../config/GameConfig';
+import {
+  angleToRoverFrame,
+  moveInputToFacing,
+  roverFrameToAngle,
+} from '../rover/roverFacing';
+import { DustTrailFx } from './DustTrailFx';
+import { LaserCannon } from './LaserCannon';
+import { RoverTreadFx } from './RoverTreadFx';
 
 type ArrowKeys = {
   up: Input.Keyboard.Key;
@@ -14,6 +27,8 @@ export type MoveInput = {
   y: number;
 };
 
+const ROTATION_SNAP_RAD = PhaserMath.DegToRad(5);
+
 export class Rover extends GameObjects.Container {
   private readonly wasd: ArrowKeys;
   private readonly arrows: ArrowKeys;
@@ -24,7 +39,12 @@ export class Rover extends GameObjects.Container {
   private joystickInputX = 0;
   private joystickInputY = 0;
   private moveSpeed: number = GameConfig.rover.speed;
+  private readonly hullLayer: GameObjects.Container;
   private readonly hull: GameObjects.Sprite;
+  private readonly weaponBase: GameObjects.Sprite;
+  private readonly treadFx: RoverTreadFx;
+  private readonly dustFx: DustTrailFx;
+  private readonly cannon: LaserCannon;
 
   public constructor(scene: Scene, x: number, y: number) {
     super(scene, x, y);
@@ -64,8 +84,30 @@ export class Rover extends GameObjects.Container {
     const display = Math.max(bodyWidth, bodyHeight);
     this.hull = new GameObjects.Sprite(scene, 0, 0, 'rover', 0);
     this.hull.setDisplaySize(display, display);
-    this.drawBody();
+    const { weaponBaseOffsetX, weaponBaseOffsetY, cannonDisplaySize } = GameConfig.survival;
+    this.weaponBase = new GameObjects.Sprite(scene, weaponBaseOffsetX, weaponBaseOffsetY, 'weapon-base', 0);
+    this.weaponBase.setDisplaySize(cannonDisplaySize, cannonDisplaySize);
+    this.treadFx = new RoverTreadFx(scene);
+    this.hullLayer = new GameObjects.Container(scene, 0, 0, [
+      this.hull,
+      this.weaponBase,
+      this.treadFx,
+    ]);
+    this.dustFx = new DustTrailFx(scene, 'player');
+    this.cannon = new LaserCannon(scene);
+    this.add(this.hullLayer);
+    this.add(this.cannon);
+    this.syncHullFrame();
     scene.add.existing(this);
+    this.once('destroy', () => this.dustFx.destroy());
+  }
+
+  public getDustFx(): DustTrailFx {
+    return this.dustFx;
+  }
+
+  public getCannon(): LaserCannon {
+    return this.cannon;
   }
 
   /**
@@ -81,7 +123,6 @@ export class Rover extends GameObjects.Container {
     const { magnetOffsetY } = GameConfig.rover;
     const cos = Math.cos(this.rotation);
     const sin = Math.sin(this.rotation);
-    // Local (0, magnetOffsetY) under Phaser rotation: (-y·sin, y·cos).
     return {
       x: this.x - sin * magnetOffsetY,
       y: this.y + cos * magnetOffsetY,
@@ -103,90 +144,80 @@ export class Rover extends GameObjects.Container {
 
   public updateRover(delta: number): void {
     const input = this.readMoveInput();
+    const hasInput = input.x !== 0 || input.y !== 0;
     const speed = this.speedBoostActive
       ? GameConfig.debug.boostSpeed
       : this.moveSpeed;
+    const {
+      accelSmoothing,
+      brakeSmoothing,
+      stopSnapSpeed,
+      rotationSmoothing,
+    } = GameConfig.rover;
+    const smoothing = hasInput ? accelSmoothing : brakeSmoothing;
 
     this.velocityX = this.damp(
       this.velocityX,
       input.x * speed,
-      GameConfig.rover.inputSmoothing,
+      smoothing,
       delta,
     );
     this.velocityY = this.damp(
       this.velocityY,
       input.y * speed,
-      GameConfig.rover.inputSmoothing,
+      smoothing,
       delta,
     );
+
+    if (!hasInput) {
+      const currentSpeed = Math.hypot(this.velocityX, this.velocityY);
+      if (currentSpeed < stopSnapSpeed) {
+        this.velocityX = 0;
+        this.velocityY = 0;
+      }
+    }
 
     const dt = delta / 1000;
     this.x += this.velocityX * dt;
     this.y += this.velocityY * dt;
     this.clampToMap();
 
-    if (this.isMoving) {
-      const targetRotation = Math.atan2(this.velocityX, -this.velocityY);
-      this.rotation = PhaserMath.Angle.RotateTo(
+    const inputFacing = moveInputToFacing(input);
+    let targetRotation: number | null = inputFacing;
+    if (targetRotation === null && this.isMoving) {
+      targetRotation = Math.atan2(this.velocityX, -this.velocityY);
+    }
+
+    if (targetRotation !== null) {
+      const angleDelta = PhaserMath.Angle.ShortestBetween(
         this.rotation,
         targetRotation,
-        GameConfig.rover.rotationSmoothing * (delta / 16.6667),
       );
+      if (Math.abs(angleDelta) < ROTATION_SNAP_RAD) {
+        this.rotation = targetRotation;
+      } else {
+        this.rotation = PhaserMath.Angle.RotateTo(
+          this.rotation,
+          targetRotation,
+          rotationSmoothing * (delta / 16.6667),
+        );
+      }
     }
 
     this.syncHullFrame(input);
+    const currentSpeed = Math.hypot(this.velocityX, this.velocityY);
+    this.treadFx.updateFx(currentSpeed, speed, delta);
+    this.dustFx.updateTrail(this.x, this.y, this.rotation, currentSpeed, delta);
   }
 
   /**
    * Push the rover out of a solid AABB (no physics plugin — circle vs rect).
    */
   public resolveSolidRect(rect: Geom.Rectangle): void {
-    const radius = Math.max(GameConfig.rover.bodyWidth, GameConfig.rover.bodyHeight) / 2;
-    const closestX = PhaserMath.Clamp(this.x, rect.left, rect.right);
-    const closestY = PhaserMath.Clamp(this.y, rect.top, rect.bottom);
-    let dx = this.x - closestX;
-    let dy = this.y - closestY;
-    const distSq = dx * dx + dy * dy;
-    const radiusSq = radius * radius;
-
-    if (distSq >= radiusSq) {
-      return;
-    }
-
-    if (distSq < 0.0001) {
-      const overlapLeft = this.x - rect.left;
-      const overlapRight = rect.right - this.x;
-      const overlapTop = this.y - rect.top;
-      const overlapBottom = rect.bottom - this.y;
-      const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
-      if (minOverlap === overlapLeft) {
-        this.x = rect.left - radius;
-        this.velocityX = Math.min(this.velocityX, 0);
-      } else if (minOverlap === overlapRight) {
-        this.x = rect.right + radius;
-        this.velocityX = Math.max(this.velocityX, 0);
-      } else if (minOverlap === overlapTop) {
-        this.y = rect.top - radius;
-        this.velocityY = Math.min(this.velocityY, 0);
-      } else {
-        this.y = rect.bottom + radius;
-        this.velocityY = Math.max(this.velocityY, 0);
-      }
-      this.clampToMap();
-      return;
-    }
-
-    const dist = Math.sqrt(distSq);
-    const nx = dx / dist;
-    const ny = dy / dist;
-    const push = radius - dist;
-    this.x += nx * push;
-    this.y += ny * push;
-    const into = this.velocityX * nx + this.velocityY * ny;
-    if (into < 0) {
-      this.velocityX -= into * nx;
-      this.velocityY -= into * ny;
-    }
+    const vel = { velocityX: this.velocityX, velocityY: this.velocityY };
+    resolveCircleVsRect(this, vel, hullRadius(), rect);
+    this.velocityX = vel.velocityX;
+    this.velocityY = vel.velocityY;
     this.clampToMap();
   }
 
@@ -217,65 +248,40 @@ export class Rover extends GameObjects.Container {
     return { x, y };
   }
 
-  private drawBody(): void {
-    const graphics = this.scene.add.graphics();
-    this.drawMagnetCue(graphics);
-    this.add(graphics);
-    this.add(this.hull);
-    this.syncHullFrame();
-  }
-
   /**
-   * Facing is baked into the 8-dir sheet. Counter-rotate the sprite so the
-   * container can still rotate the rear magnet in world space.
-   * Frame follows the move vector; container rotation stays smoothed for the magnet.
+   * Facing is baked into the hull sheet. Counter-rotate the hull layer so the
+   * container can still yaw the laser cannon in world space.
    */
   private syncHullFrame(input?: MoveInput): void {
     const move = input ?? this.readMoveInput();
-    let ax = move.x;
-    let ay = move.y;
-    if (ax === 0 && ay === 0) {
-      ax = this.velocityX;
-      ay = this.velocityY;
+    let facing = moveInputToFacing(move);
+    if (facing === null) {
+      if (this.velocityX !== 0 || this.velocityY !== 0) {
+        facing = Math.atan2(this.velocityX, -this.velocityY);
+      } else {
+        facing = this.rotation;
+      }
     }
-    const facing =
-      ax !== 0 || ay !== 0 ? Math.atan2(ax, -ay) : this.rotation;
-    const step = Math.PI / 4;
-    const wrapped = PhaserMath.Angle.Wrap(facing);
-    let index = Math.round(wrapped / step) % 8;
-    if (index < 0) {
-      index += 8;
-    }
-    this.hull.setFrame(index);
-    this.hull.setRotation(-this.rotation);
-  }
-
-  /** Soft rear glow + ring only — full magnetRadius preview belongs to MagnetSystem (US-009). */
-  private drawMagnetCue(graphics: GameObjects.Graphics): void {
-    const { magnetOffsetY, magnetGlowRadius, magnetRingRadius, magnetRingWidth } =
-      GameConfig.rover;
-    const { magnetGlow } = GameConfig.colors;
-
-    graphics.fillStyle(magnetGlow, 0.12);
-    graphics.fillCircle(0, magnetOffsetY, magnetGlowRadius);
-    graphics.fillStyle(magnetGlow, 0.28);
-    graphics.fillCircle(0, magnetOffsetY, magnetGlowRadius * 0.65);
-    graphics.fillStyle(magnetGlow, 0.55);
-    graphics.fillCircle(0, magnetOffsetY, magnetGlowRadius * 0.35);
-
-    graphics.lineStyle(magnetRingWidth, magnetGlow, 0.9);
-    graphics.strokeCircle(0, magnetOffsetY, magnetRingRadius);
+    const frame = angleToRoverFrame(facing);
+    this.hull.setFrame(frame);
+    this.weaponBase.setFrame(frame);
+    this.hullLayer.setRotation(-this.rotation);
+    // Hull art is pre-rotated in the sheet; the layer cancels container yaw so the
+    // cannon can still turn in world space. Tread FX is procedural, so it must be
+    // rotated to the baked frame or the highlights sit on world axes (often opposite
+    // the hull).
+    this.treadFx.setRotation(roverFrameToAngle(frame));
   }
 
   private clampToMap(): void {
-    const radius = Math.max(GameConfig.rover.bodyWidth, GameConfig.rover.bodyHeight) / 2;
-    const inset = GameConfig.map.wallInset + radius;
     const mapWidth = this.scene.registry.get('mapWidth') as number | undefined;
     const mapHeight = this.scene.registry.get('mapHeight') as number | undefined;
-    const width = mapWidth ?? GameConfig.map.width;
-    const height = mapHeight ?? GameConfig.map.height;
-    this.x = PhaserMath.Clamp(this.x, inset, width - inset);
-    this.y = PhaserMath.Clamp(this.y, inset, height - inset);
+    clampToMap(
+      this,
+      hullRadius(),
+      mapWidth ?? GameConfig.map.width,
+      mapHeight ?? GameConfig.map.height,
+    );
   }
 
   private damp(current: number, target: number, smoothing: number, delta: number): number {

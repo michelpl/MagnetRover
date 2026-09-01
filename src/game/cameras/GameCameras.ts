@@ -7,8 +7,14 @@ export const UI_CAMERA_NAME = 'ui';
 /** Keep a world-space object off the unzoomed HUD camera. */
 export function ignoreUiCamera(scene: Scene, obj: GameObjects.GameObject): void {
   const ui = scene.cameras.getCamera(UI_CAMERA_NAME);
-  if (ui) {
-    ui.ignore(obj);
+  if (!ui) {
+    return;
+  }
+  ui.ignore(obj);
+  if (obj instanceof GameObjects.Container) {
+    for (const child of obj.list) {
+      ignoreUiCamera(scene, child);
+    }
   }
 }
 
@@ -47,7 +53,7 @@ export function bindPlayCameras(scene: Scene, follow: GameObjects.GameObject): v
     if (child.scrollFactorX === 0 && child.scrollFactorY === 0) {
       ignoreWorldCamera(scene, child);
     } else {
-      ui.ignore(child);
+      ignoreUiCamera(scene, child);
     }
   });
 

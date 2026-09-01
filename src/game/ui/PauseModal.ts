@@ -1,8 +1,13 @@
-import { GameObjects, Scene } from 'phaser';
+import { GameObjects, Input, Scene } from 'phaser';
 import { ignoreWorldCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
 import { Save } from '../save/Save';
 import { bindViewResize, viewSize } from './viewSize';
+
+type PauseItem = {
+  bg: GameObjects.Rectangle;
+  activate: () => void;
+};
 
 /**
  * Full-screen overlay: Continue resumes, Quit returns to the menu, mute toggles persist.
@@ -12,6 +17,8 @@ export class PauseModal {
   private readonly dim: GameObjects.Rectangle;
   private readonly sfxLabel: GameObjects.Text;
   private readonly hapticsLabel: GameObjects.Text;
+  private readonly items: PauseItem[] = [];
+  private focusIndex = 2;
 
   public constructor(
     scene: Scene,
@@ -85,6 +92,7 @@ export class PauseModal {
     ignoreWorldCamera(scene, this.root);
     this.setOpen(false);
     this.refreshToggles();
+    this.bindKeyboard(scene);
 
     bindViewResize(scene, () => {
       const size = viewSize(scene);
@@ -94,11 +102,67 @@ export class PauseModal {
 
   public show(): void {
     this.refreshToggles();
+    this.focusIndex = 2;
     this.setOpen(true);
+    this.refreshFocus();
   }
 
   public hide(): void {
     this.setOpen(false);
+  }
+
+  private bindKeyboard(scene: Scene): void {
+    const keyboard = scene.input.keyboard;
+    if (!keyboard) {
+      return;
+    }
+    keyboard.addCapture([Input.Keyboard.KeyCodes.ENTER]);
+    const onKey = (event: KeyboardEvent) => this.onKeyDown(event);
+    scene.input.keyboard?.on('keydown', onKey);
+    scene.events.once('shutdown', () => {
+      scene.input.keyboard?.off('keydown', onKey);
+    });
+  }
+
+  private onKeyDown(event: KeyboardEvent): void {
+    if (!this.root.visible) {
+      return;
+    }
+    const raw = event.key;
+    if (!raw) {
+      return;
+    }
+    const key = raw.toLowerCase();
+    if (key === 'w' || key === 'a' || key === 'arrowup' || key === 'arrowleft') {
+      this.moveFocus(-1);
+      event.preventDefault();
+      return;
+    }
+    if (key === 's' || key === 'd' || key === 'arrowdown' || key === 'arrowright') {
+      this.moveFocus(1);
+      event.preventDefault();
+      return;
+    }
+    if (key === 'enter') {
+      this.items[this.focusIndex]?.activate();
+      event.preventDefault();
+    }
+  }
+
+  private moveFocus(delta: number): void {
+    const count = this.items.length;
+    this.focusIndex = (this.focusIndex + delta + count) % count;
+    this.refreshFocus();
+  }
+
+  private refreshFocus(): void {
+    this.items.forEach((item, index) => {
+      if (index === this.focusIndex) {
+        item.bg.setStrokeStyle(4, GameConfig.colors.roverAccent);
+      } else {
+        item.bg.setStrokeStyle(0);
+      }
+    });
   }
 
   private setOpen(open: boolean): void {
@@ -129,7 +193,12 @@ export class PauseModal {
     label: string,
     fill: number,
     onClick: () => void,
-  ): { parts: GameObjects.GameObject[]; label: GameObjects.Text } {
+  ): {
+    parts: GameObjects.GameObject[];
+    label: GameObjects.Text;
+    bg: GameObjects.Rectangle;
+    activate: () => void;
+  } {
     const bg = scene.add
       .rectangle(x, y, 400, 88, fill, 1)
       .setInteractive({ useHandCursor: true });
@@ -142,8 +211,22 @@ export class PauseModal {
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
-    bg.on('pointerdown', onClick);
-    text.on('pointerdown', onClick);
-    return { parts: [bg, text], label: text };
+    const activate = () => onClick();
+    const select = (index: number) => {
+      this.focusIndex = index;
+      this.refreshFocus();
+    };
+
+    const index = this.items.length;
+    this.items.push({ bg, activate });
+    bg.on('pointerdown', () => {
+      select(index);
+      activate();
+    });
+    text.on('pointerdown', () => {
+      select(index);
+      activate();
+    });
+    return { parts: [bg, text], label: text, bg, activate };
   }
 }

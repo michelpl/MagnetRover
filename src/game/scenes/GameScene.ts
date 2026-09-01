@@ -1,6 +1,7 @@
-import { Geom, Scene } from 'phaser';
+import { Geom, Input, Scene } from 'phaser';
 import { Audio } from '../audio/Audio';
 import { GameConfig, isDebugMode } from '../config/GameConfig';
+import { getObstacleVisual } from '../config/Obstacles';
 import { getStageById } from '../config/Stages';
 import type { StageConfig } from '../config/StageConfig';
 import { totalWaveEnemies } from '../config/Stages';
@@ -24,11 +25,18 @@ import { SettingsButton } from '../ui/SettingsButton';
 import { SettingsModal } from '../ui/SettingsModal';
 import { WalletBar } from '../ui/WalletBar';
 import { WaveIndicator } from '../ui/WaveIndicator';
-import { bindPlayCameras } from '../cameras/GameCameras';
+import { bindPlayCameras, ignoreUiCamera } from '../cameras/GameCameras';
+import { hullRadius, separateCircles } from '../collision/solidBody';
+import type { WeaponId } from '../config/Weapons';
 import type { ResultPayload } from './ResultScene';
 
 const DEFAULT_STAGE_ID = 1;
 const RESULT_DELAY_MS = 400;
+
+/** Survival runs use the laser cannon only. */
+function survivalLoadout(): (WeaponId | null)[] {
+  return ['laser_cannon', null, null, null];
+}
 
 export class GameScene extends Scene {
   private stage!: StageConfig;
@@ -87,7 +95,7 @@ export class GameScene extends Scene {
       armor: roverStats.armor,
     });
     this.combatSystem = new CombatSystem(this.rover, this.hpSystem, {
-      onEnemyKilled: () => undefined,
+      onEnemyRemoved: (enemy) => this.removeEnemy(enemy),
       onRoverDamaged: () => {
         this.roverFlashMs = GameConfig.survival.roverDamageFlashMs;
       },
@@ -106,6 +114,10 @@ export class GameScene extends Scene {
         this.enemies.push(enemy);
         return enemy;
       },
+      () =>
+        this.enemies
+          .filter((enemy) => enemy.active)
+          .map((enemy) => ({ x: enemy.x, y: enemy.y })),
     );
     this.combatSystem.initRemaining(totalWaveEnemies(this.stage.wave));
 
@@ -113,7 +125,7 @@ export class GameScene extends Scene {
       this,
       this.rover,
       this.combatSystem,
-      save.loadout,
+      survivalLoadout(),
       save.weaponUpgrades,
       this.obstacleColliders,
     );
@@ -143,18 +155,37 @@ export class GameScene extends Scene {
     }
 
     bindPlayCameras(this, this.rover);
+    ignoreUiCamera(this, this.rover);
+    ignoreUiCamera(this, this.rover.getDustFx());
+    this.bindRunKeyboard();
 
     if (this.stage.id === 1 && !save.tutorialDone) {
       this.tutorial = new TutorialOverlay(this);
     }
 
     this.events.once('shutdown', () => {
+      this.disposeEnemies();
       this.weaponSystem?.dispose();
     });
   }
 
   public shutdown(): void {
+    this.disposeEnemies();
     this.weaponSystem?.dispose();
+  }
+
+  private removeEnemy(enemy: Enemy): void {
+    const index = this.enemies.indexOf(enemy);
+    if (index >= 0) {
+      this.enemies.splice(index, 1);
+    }
+  }
+
+  private disposeEnemies(): void {
+    for (const enemy of this.enemies) {
+      enemy.destroy();
+    }
+    this.enemies.length = 0;
   }
 
   public update(_time: number, delta: number): void {
@@ -174,15 +205,10 @@ export class GameScene extends Scene {
 
     for (const enemy of this.enemies) {
       if (enemy.active) {
-        enemy.updateChase(
-          delta,
-          this.rover.x,
-          this.rover.y,
-          this.stage.mapWidth,
-          this.stage.mapHeight,
-        );
+        enemy.updateChase(delta, this.rover.x, this.rover.y);
       }
     }
+    this.resolveEnemyCollisions();
 
     this.combatSystem.updateContact(this.enemies);
     this.weaponSystem.update(
@@ -232,6 +258,75 @@ export class GameScene extends Scene {
       yoyo: true,
       repeat: 2,
     });
+  }
+
+  private bindRunKeyboard(): void {
+    const keyboard = this.input.keyboard;
+    if (!keyboard) {
+      throw new Error('Keyboard plugin is required for pause controls');
+    }
+    keyboard.addCapture([Input.Keyboard.KeyCodes.ESC, Input.Keyboard.KeyCodes.ENTER]);
+    keyboard.on('keydown-ESC', this.onEscPressed, this);
+    this.events.once('shutdown', () => {
+      keyboard.off('keydown-ESC', this.onEscPressed, this);
+    });
+  }
+
+  private onEscPressed(): void {
+    if (this.ending) {
+      return;
+    }
+    if (this.settingsModal.isOpen) {
+      this.settingsModal.hide();
+      return;
+    }
+    this.setPaused(!this.paused);
+  }
+
+  private resolveEnemyCollisions(): void {
+    const radius = hullRadius();
+    const { mapWidth, mapHeight } = this.stage;
+
+    for (const enemy of this.enemies) {
+      if (!enemy.active) {
+        continue;
+      }
+      for (const collider of this.obstacleColliders) {
+        enemy.resolveSolidRect(collider);
+      }
+      enemy.clampToWorld(mapWidth, mapHeight);
+    }
+
+    for (let i = 0; i < this.enemies.length; i += 1) {
+      const a = this.enemies[i];
+      if (!a?.active) {
+        continue;
+      }
+      for (let j = i + 1; j < this.enemies.length; j += 1) {
+        const b = this.enemies[j];
+        if (!b?.active) {
+          continue;
+        }
+        separateCircles(a, b, radius, radius, 0.5);
+      }
+    }
+
+    for (const enemy of this.enemies) {
+      if (!enemy.active) {
+        continue;
+      }
+      // Same hull radii as obstacles. Contact damage uses >= 2× this radius so a
+      // resting bump still hits (see GameConfig.survival.contactOverlapRadius).
+      separateCircles(this.rover, enemy, radius, radius, 0.2);
+      for (const collider of this.obstacleColliders) {
+        enemy.resolveSolidRect(collider);
+      }
+      enemy.clampToWorld(mapWidth, mapHeight);
+    }
+
+    for (const collider of this.obstacleColliders) {
+      this.rover.resolveSolidRect(collider);
+    }
   }
 
   private setPaused(paused: boolean): void {
@@ -330,11 +425,15 @@ export class GameScene extends Scene {
       this.obstacleColliders.push(
         new Geom.Rectangle(obstacle.x, obstacle.y, obstacle.width, obstacle.height),
       );
-      const graphics = this.add.graphics();
-      graphics.fillStyle(0x3d3d4a, 0.92);
-      graphics.fillRoundedRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height, 8);
-      graphics.lineStyle(2, 0x868e96, 0.8);
-      graphics.strokeRoundedRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height, 8);
+      const visual = getObstacleVisual(obstacle.variant);
+      this.add
+        .image(
+          obstacle.x + obstacle.width / 2,
+          obstacle.y + obstacle.height / 2,
+          visual.textureKey,
+        )
+        .setDisplaySize(visual.displayWidth, visual.displayHeight)
+        .setDepth(1);
     }
   }
 

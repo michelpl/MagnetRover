@@ -6,6 +6,11 @@ import { Scene } from 'phaser';
 
 export type SpawnEnemyFn = (x: number, y: number, recipe: EnemyRecipe) => Enemy;
 
+type SpawnBlocker = {
+  x: number;
+  y: number;
+};
+
 type BurstState = {
   burstIndex: number;
   spawnedInBurst: number;
@@ -32,6 +37,7 @@ export class WaveSpawnSystem {
     stage: StageConfig,
     private readonly rover: Rover,
     private readonly spawnEnemy: SpawnEnemyFn,
+    private readonly getSpawnBlockers: () => readonly SpawnBlocker[],
   ) {
     this.wave = stage.wave;
     this.recipe = stage.enemyRecipe;
@@ -95,6 +101,8 @@ export class WaveSpawnSystem {
       (this.scene.registry.get('mapHeight') as number | undefined) ?? GameConfig.map.height;
     const inset = GameConfig.survival.spawnEdgeInset;
     const minDist = GameConfig.survival.spawnMinDistanceFromRover;
+    const minSeparation = GameConfig.survival.spawnMinEnemySeparation;
+    const blockers = this.getSpawnBlockers();
 
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const edge = Math.floor(Math.random() * 4);
@@ -113,14 +121,32 @@ export class WaveSpawnSystem {
         x = inset;
         y = inset + Math.random() * (mapHeight - inset * 2);
       }
-      if (Math.hypot(x - this.rover.x, y - this.rover.y) >= minDist) {
-        return { x, y };
+      if (Math.hypot(x - this.rover.x, y - this.rover.y) < minDist) {
+        continue;
       }
+      if (this.isTooCloseToBlocker(x, y, blockers, minSeparation)) {
+        continue;
+      }
+      return { x, y };
     }
 
     return {
       x: Math.max(inset, Math.min(mapWidth - inset, this.rover.x + minDist)),
       y: Math.max(inset, Math.min(mapHeight - inset, this.rover.y)),
     };
+  }
+
+  private isTooCloseToBlocker(
+    x: number,
+    y: number,
+    blockers: readonly SpawnBlocker[],
+    minSeparation: number,
+  ): boolean {
+    for (const blocker of blockers) {
+      if (Math.hypot(x - blocker.x, y - blocker.y) < minSeparation) {
+        return true;
+      }
+    }
+    return false;
   }
 }

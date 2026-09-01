@@ -8,7 +8,7 @@ import { viewSize } from './viewSize';
 
 const STEPS: readonly { title: string; body: string }[] = [
   { title: 'Drive', body: 'Slide the stick to move the rover.' },
-  { title: 'Auto weapons', body: 'Equipped weapons fire automatically.' },
+  { title: 'Laser cannon', body: 'The laser auto-aims enemies in a 120° cone ahead of the rover.' },
   { title: 'Avoid damage', body: 'Hostile rovers drain your HP on contact.' },
   { title: 'Clear the wave', body: 'Eliminate all enemies to win the stage.' },
 ];

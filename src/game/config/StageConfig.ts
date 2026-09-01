@@ -14,7 +14,18 @@ export type EnemyRecipe = {
   contactDamage: number;
 };
 
+export type ObstacleVariant =
+  | 'barrier'
+  | 'pillar'
+  | 'vat_long'
+  | 'pool_wide'
+  | 'crate_tall'
+  | 'vat_square'
+  | 'crate_rect'
+  | 'crate_square';
+
 export type StageObstacle = {
+  variant: ObstacleVariant;
   x: number;
   y: number;
   width: number;
