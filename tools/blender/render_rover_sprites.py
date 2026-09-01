@@ -1,5 +1,5 @@
 """
-Render 8-direction rover sprites from the Meshy FBX with a locked game camera.
+Render 16-direction rover sprites from the Meshy FBX with a locked game camera.
 
 Run:
   blender --background --python tools/blender/render_rover_sprites.py
@@ -30,8 +30,8 @@ TEXTURE_STEM = "Meshy_AI_Lunar_Rover_Mini_0826181139_texture"
 
 OUTPUT_DIR = REPO_ROOT / "public" / "assets" / "sprites" / "rover"
 FRAME_SIZE = 256
-FRAME_COUNT = 8
-YAW_STEP_DEG = 45.0
+FRAME_COUNT = 16
+YAW_STEP_DEG = 22.5
 # Meshy rest pose: green panel along +X, face/eyes along -X.
 # Offset so north (frame 0) has the eyes toward +Y (top of the PNG).
 MESH_FORWARD_OFFSET_DEG = -90.0
@@ -287,9 +287,28 @@ def configure_render() -> None:
             scene.eevee.use_shadows = True
 
 
+FACING_NAMES = (
+    "n",
+    "nne",
+    "ne",
+    "ene",
+    "e",
+    "ese",
+    "se",
+    "sse",
+    "s",
+    "ssw",
+    "sw",
+    "wsw",
+    "w",
+    "wnw",
+    "nw",
+    "nnw",
+)
+
+
 def facing_name(index: int) -> str:
-    # Phaser rotation is clockwise (Y-down): 0=N, 1=NE, 2=E, ...
-    return ("n", "ne", "e", "se", "s", "sw", "w", "nw")[index]
+    return FACING_NAMES[index]
 
 
 def render_frames(root: bpy.types.Object) -> list[Path]:

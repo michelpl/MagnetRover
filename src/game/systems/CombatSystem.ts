@@ -1,12 +1,14 @@
 import { GameConfig } from '../config/GameConfig';
+import { hullRadius } from '../collision/solidBody';
 import type { Enemy } from '../entities/Enemy';
+import { spawnHitSpark } from '../entities/HitSparkFx';
 import type { Rover } from '../entities/Rover';
 import { Audio } from '../audio/Audio';
 import { Haptics } from '../audio/Haptics';
 import type { HpSystem } from './HpSystem';
 
 export type CombatCallbacks = {
-  onEnemyKilled: () => void;
+  onEnemyRemoved: (enemy: Enemy) => void;
   onRoverDamaged: () => void;
   onKillShake: () => void;
 };
@@ -31,7 +33,10 @@ export class CombatSystem {
   }
 
   public updateContact(enemies: readonly Enemy[]): void {
-    const radius = GameConfig.survival.contactOverlapRadius;
+    const radius = Math.max(
+      GameConfig.survival.contactOverlapRadius,
+      hullRadius() * 2,
+    );
     for (const enemy of enemies) {
       if (!enemy.active) {
         continue;
@@ -48,12 +53,18 @@ export class CombatSystem {
     }
   }
 
-  public applyWeaponDamage(enemy: Enemy, amount: number): void {
+  public applyWeaponDamage(
+    enemy: Enemy,
+    amount: number,
+    sparkX?: number,
+    sparkY?: number,
+  ): void {
     if (!enemy.active || amount <= 0) {
       return;
     }
     enemy.hp -= amount;
     enemy.flashHit();
+    spawnHitSpark(enemy.scene, sparkX ?? enemy.x, sparkY ?? enemy.y);
     Audio.play('hit');
     if (enemy.hp <= 0) {
       this.killEnemy(enemy);
@@ -71,7 +82,7 @@ export class CombatSystem {
     Audio.play('enemyDeath');
     Haptics.vibrate(8);
     enemy.playDeath(enemy.scene, () => {
-      this.callbacks.onEnemyKilled();
+      this.callbacks.onEnemyRemoved(enemy);
     });
   }
 }

@@ -3,12 +3,6 @@ import type { StageConfig } from './StageConfig';
 
 const { width: mapWidth, height: mapHeight } = GameConfig.map;
 
-const BASE_OBSTACLES = [
-  { x: 420, y: 280, width: 120, height: 80 },
-  { x: 980, y: 520, width: 140, height: 90 },
-  { x: 680, y: 680, width: 100, height: 100 },
-] as const;
-
 function stage(
   id: number,
   name: string,
@@ -21,7 +15,7 @@ function stage(
     mapWidth,
     mapHeight,
     backgroundKey: 'scenario1',
-    obstacles: BASE_OBSTACLES.map((o) => ({ ...o })),
+    obstacles: [],
     enemyRecipe,
     wave,
   };

@@ -1,6 +1,7 @@
 import { Scene, Textures } from 'phaser';
 import { Audio } from '../audio/Audio';
 import { GameConfig } from '../config/GameConfig';
+import { getObstacleVisual, OBSTACLE_VARIANTS } from '../config/Obstacles';
 import { SplashScreen } from '../ui/SplashScreen';
 
 export class BootScene extends Scene {
@@ -32,6 +33,14 @@ export class BootScene extends Scene {
       frameWidth: GameConfig.rover.spriteFrameSize,
       frameHeight: GameConfig.rover.spriteFrameSize,
     });
+    this.load.spritesheet('weapon-base', 'assets/sprites/weapons/weapon_base.png', {
+      frameWidth: GameConfig.survival.cannonSpriteFrameSize,
+      frameHeight: GameConfig.survival.cannonSpriteFrameSize,
+    });
+    this.load.spritesheet('laser-cannon', 'assets/sprites/weapons/laser_cannon.png', {
+      frameWidth: GameConfig.survival.cannonSpriteFrameSize,
+      frameHeight: GameConfig.survival.cannonSpriteFrameSize,
+    });
     this.load.image('hub-shop', 'assets/ui/shop-icon.png');
     this.load.image('hub-stages', 'assets/ui/stages-icon.png');
     this.load.image('hub-garage', 'assets/ui/garage-icon.png');
@@ -47,6 +56,10 @@ export class BootScene extends Scene {
       frameHeight: 384,
     });
     this.load.image('stage-lock', 'assets/ui/stage-lock.png');
+    for (const variant of OBSTACLE_VARIANTS) {
+      const visual = getObstacleVisual(variant);
+      this.load.image(visual.textureKey, visual.assetPath);
+    }
   }
 
   private async finishBoot(): Promise<void> {

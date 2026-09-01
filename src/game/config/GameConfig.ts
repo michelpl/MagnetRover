@@ -71,13 +71,22 @@ export const GameConfig = {
   },
   rover: {
     speed: 160,
-    inputSmoothing: 0.18,
-    rotationSmoothing: 0.2,
+    /** Velocity lerp toward target while input is active. */
+    accelSmoothing: 0.35,
+    /** Velocity lerp toward zero when input is released. */
+    brakeSmoothing: 0.55,
+    rotationSmoothing: 0.45,
+    /** Below this speed (px/s) with no input, velocity snaps to zero. */
+    stopSnapSpeed: 12,
     /** Speed below this (px/s on either axis) counts as stopped for rotation / energy. */
     moveEpsilon: 8,
+    /** Packed frames in `assets/sprites/rover/rover.png`. */
+    directionCount: 16,
+    /** Unique poses on that sheet (skip blended 16-dir intermediates). */
+    uniqueFacingCount: 8,
     bodyWidth: 34,
     bodyHeight: 44,
-    /** Packed 8-dir sheet in `assets/sprites/rover/rover.png`. */
+    /** Packed multi-dir sheet in `assets/sprites/rover/rover.png`. */
     spriteFrameSize: 256,
     /** Max cubes in the trailing cargo queue (US-011). */
     capacity: 3,
@@ -86,6 +95,52 @@ export const GameConfig = {
     magnetGlowRadius: 13,
     magnetRingRadius: 10,
     magnetRingWidth: 2,
+    /**
+     * Procedural tread highlight (US-162).
+     * Drawn in hull-local space along +Y (rear) → −Y (front). After the hull
+     * layer counter-rotates, `Rover`/`Enemy` set Graphics rotation to the baked
+     * frame angle so the glow sits on the tracks, not on world axes.
+     */
+    tread: {
+      offsetX: 12,
+      offsetY: 1,
+      length: 22,
+      width: 2,
+      segmentCount: 2,
+      segmentLength: 5,
+      scrollRate: 0.009,
+      maxAlpha: 0.18,
+      fadeSmoothing: 0.35,
+      glowColor: 0xfff4e6,
+    },
+    /** Procedural floor dust left behind moving hulls (player trail). */
+    dust: {
+      spacingPx: 9,
+      maxPuffs: 64,
+      lifeMs: 800,
+      sizeMin: 3.2,
+      sizeMax: 6.8,
+      color: 0xb7a68e,
+      maxAlpha: 0.5,
+      spread: 3.6,
+      rearOffsetY: 16,
+      trackOffsetX: 11,
+      extraPuffs: 2,
+    },
+    /** Quieter trail for chasing enemies. */
+    enemyDust: {
+      spacingPx: 16,
+      maxPuffs: 24,
+      lifeMs: 420,
+      sizeMin: 1.6,
+      sizeMax: 3.4,
+      color: 0xb7a68e,
+      maxAlpha: 0.28,
+      spread: 2.4,
+      rearOffsetY: 16,
+      trackOffsetX: 11,
+      extraPuffs: 0,
+    },
   },
   camera: {
     lerp: 0.08,
@@ -174,7 +229,6 @@ export const GameConfig = {
     /** World Y of the rover, aligned to the painted pad on garage-bg (cover-fit). */
     showcaseY: 762,
     roverDisplaySize: 260,
-    roverFrame: 3,
     cardsTop: 930,
     cardWidth: 984,
     cardHeight: 168,
@@ -318,7 +372,13 @@ export const GameConfig = {
     invulnMs: 300,
     hitFlashMs: 120,
     roverDamageFlashMs: 150,
-    contactOverlapRadius: 32,
+    /**
+     * Contact damage when rover–enemy center distance is within this radius.
+     * Must be >= 2 × hullRadius() (bodyWidth/bodyHeight). Physical separation
+     * uses those hull radii; a smaller contact radius made enemies bump the
+     * rover without ever applying damage.
+     */
+    contactOverlapRadius: 48,
     weaponDamageMultiplier: 1,
     weaponUpgradeDamagePerTier: 4,
     spawnMinDistanceFromRover: 220,
@@ -326,7 +386,29 @@ export const GameConfig = {
     projectilePoolSize: 48,
     killShakeDurationMs: 120,
     killShakeIntensity: 0.006,
-    muzzleFlashMs: 80,
+    muzzleFlashMs: 50,
+    /** Forward arc (degrees) for laser auto-aim. Player facing sets the cone; shots snap to targets inside it. */
+    fireConeDeg: 120,
+    /** Packed frames in `assets/sprites/weapons/laser_cannon.png` (8×4). */
+    cannonDirectionCount: 32,
+    cannonSpriteFrameSize: 256,
+    /** Same mapping as the rover hull: 256 source at rover ortho_scale. */
+    cannonDisplaySize: 44,
+    /** Local Y of the cannon mount (negative = toward the hull front). */
+    cannonOffsetY: -6,
+    /** Hull-local offset of the weapon disc (same space as the baked hull sprite). */
+    weaponBaseOffsetX: 0,
+    weaponBaseOffsetY: -6,
+    /** Local Y of the barrel tip relative to the cannon origin. */
+    cannonMuzzleLocalY: -8,
+    laserMuzzleOffset: 28,
+    laserDashLength: 22,
+    laserDashWidth: 5,
+    laserColor: 0xff4d6d,
+    laserHitRadius: 16,
+    spawnMinEnemySeparation: 48,
+    hitSparkRadius: 8,
+    hitSparkDurationMs: 120,
     stageCoinBonus: [10, 15, 20, 25, 35] as readonly number[],
   },
   roverUpgrades: {

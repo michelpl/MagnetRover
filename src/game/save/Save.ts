@@ -41,38 +41,48 @@ const DEFAULT_SAVE: SaveData = {
   sfxMuted: false,
   hapticsEnabled: true,
   ownedWeapons: [...DEFAULT_STARTER_WEAPONS],
-  loadout: [DEFAULT_STARTER_WEAPONS[0] ?? null, DEFAULT_STARTER_WEAPONS[1] ?? null, null, null],
+  loadout: [DEFAULT_STARTER_WEAPONS[0] ?? null, null, null, null],
   weaponUpgrades: {},
   roverUpgrades: { hp: 0, speed: 0, armor: 0 },
 };
 
-function isWeaponId(value: unknown): value is WeaponId {
-  return (
-    value === 'pulse_cannon' ||
-    value === 'arc_turret' ||
-    value === 'orbit_drone' ||
-    value === 'mine_layer'
-  );
+function parseWeaponId(value: unknown): WeaponId | null {
+  if (value === 'laser_cannon' || value === 'pulse_cannon') {
+    return 'laser_cannon';
+  }
+  return null;
 }
 
 function parseLoadout(value: unknown): (WeaponId | null)[] {
-  if (!Array.isArray(value)) {
-    return [...DEFAULT_SAVE.loadout];
-  }
   const slots: (WeaponId | null)[] = [...EMPTY_LOADOUT];
+  slots[0] = 'laser_cannon';
+  if (!Array.isArray(value)) {
+    return slots;
+  }
   for (let i = 0; i < 4; i += 1) {
-    const entry = value[i];
-    slots[i] = isWeaponId(entry) ? entry : null;
+    const mapped = parseWeaponId(value[i]);
+    if (mapped) {
+      slots[0] = mapped;
+      break;
+    }
   }
   return slots;
 }
 
-function parseOwnedWeapons(value: unknown): WeaponId[] {
-  if (!Array.isArray(value)) {
-    return [...DEFAULT_STARTER_WEAPONS];
+function parseOwnedWeapons(_value: unknown): WeaponId[] {
+  return [...DEFAULT_STARTER_WEAPONS];
+}
+
+function parseWeaponUpgrades(value: unknown): WeaponUpgradeLevels {
+  if (typeof value !== 'object' || value === null) {
+    return {};
   }
-  const owned = value.filter(isWeaponId);
-  return owned.length > 0 ? owned : [...DEFAULT_STARTER_WEAPONS];
+  const record = value as Record<string, unknown>;
+  const raw = record.laser_cannon ?? record.pulse_cannon;
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+    return {};
+  }
+  return { laser_cannon: Math.max(0, Math.floor(raw)) };
 }
 
 function isSaveData(value: unknown): value is SaveData {
@@ -206,7 +216,7 @@ function normalizeSave(parsed: SaveData): SaveData {
     hapticsEnabled: parsed.hapticsEnabled ?? true,
     ownedWeapons: parseOwnedWeapons(parsed.ownedWeapons),
     loadout: parseLoadout(parsed.loadout),
-    weaponUpgrades: parsed.weaponUpgrades ?? {},
+    weaponUpgrades: parseWeaponUpgrades(parsed.weaponUpgrades),
     roverUpgrades: {
       hp: parsed.roverUpgrades?.hp ?? 0,
       speed: parsed.roverUpgrades?.speed ?? 0,

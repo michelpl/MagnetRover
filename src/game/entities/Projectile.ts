@@ -1,8 +1,9 @@
 import { GameObjects, Geom, Scene } from 'phaser';
+import { ignoreUiCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
 
 type ActiveProjectile = {
-  gfx: GameObjects.Arc;
+  gfx: GameObjects.Rectangle;
   x: number;
   y: number;
   vx: number;
@@ -12,7 +13,7 @@ type ActiveProjectile = {
   active: boolean;
 };
 
-/** Pooled forward projectiles — no physics plugin. */
+/** Pooled laser dashes — no physics plugin. */
 export class ProjectilePool {
   private readonly pool: ActiveProjectile[] = [];
   private readonly obstacleRects: Geom.Rectangle[];
@@ -22,11 +23,12 @@ export class ProjectilePool {
     obstacleRects: readonly Geom.Rectangle[],
   ) {
     this.obstacleRects = [...obstacleRects];
-    const size = GameConfig.survival.projectilePoolSize;
-    for (let i = 0; i < size; i += 1) {
-      const gfx = scene.add.circle(0, 0, 6, 0x74c0fc, 1);
+    const { projectilePoolSize, laserDashLength, laserDashWidth, laserColor } = GameConfig.survival;
+    for (let i = 0; i < projectilePoolSize; i += 1) {
+      const gfx = scene.add.rectangle(0, 0, laserDashLength, laserDashWidth, laserColor, 1);
       gfx.setVisible(false);
       gfx.setDepth(500);
+      ignoreUiCamera(scene, gfx);
       this.pool.push({ gfx, x: 0, y: 0, vx: 0, vy: 0, damage: 0, lifeMs: 0, active: false });
     }
   }
@@ -52,6 +54,7 @@ export class ProjectilePool {
     slot.lifeMs = (range / speed) * 1000;
     slot.gfx.setVisible(true);
     slot.gfx.setPosition(x, y);
+    slot.gfx.setRotation(Math.atan2(slot.vy, slot.vx));
   }
 
   public update(
@@ -61,6 +64,7 @@ export class ProjectilePool {
     onHit: (proj: ActiveProjectile, enemyIndex: number) => boolean,
     enemies: readonly { x: number; y: number; active: boolean }[],
   ): void {
+    const hitRadius = GameConfig.survival.laserHitRadius;
     for (const proj of this.pool) {
       if (!proj.active) {
         continue;
@@ -96,7 +100,7 @@ export class ProjectilePool {
           continue;
         }
         const dist = Math.hypot(enemy.x - proj.x, enemy.y - proj.y);
-        if (dist <= 22 && onHit(proj, i)) {
+        if (dist <= hitRadius && onHit(proj, i)) {
           this.release(proj);
           break;
         }
@@ -122,56 +126,5 @@ export class ProjectilePool {
       }
     }
     return false;
-  }
-}
-
-export type MineField = {
-  x: number;
-  y: number;
-  radius: number;
-  damage: number;
-  lifeMs: number;
-  gfx: GameObjects.Arc;
-};
-
-export function spawnMine(
-  scene: Scene,
-  x: number,
-  y: number,
-  damage: number,
-): MineField {
-  const gfx = scene.add.circle(x, y, 14, 0xff922b, 0.85);
-  gfx.setDepth(400);
-  return { x, y, radius: 28, damage, lifeMs: 8000, gfx };
-}
-
-export function updateMines(
-  mines: MineField[],
-  delta: number,
-  enemies: readonly { x: number; y: number; index: number; active: boolean }[],
-  onDetonate: (mine: MineField, enemyIndex: number) => void,
-): void {
-  for (let m = mines.length - 1; m >= 0; m -= 1) {
-    const mine = mines[m];
-    if (!mine) {
-      continue;
-    }
-    mine.lifeMs -= delta;
-    if (mine.lifeMs <= 0) {
-      mine.gfx.destroy();
-      mines.splice(m, 1);
-      continue;
-    }
-    for (const enemy of enemies) {
-      if (!enemy.active) {
-        continue;
-      }
-      if (Math.hypot(enemy.x - mine.x, enemy.y - mine.y) <= mine.radius) {
-        onDetonate(mine, enemy.index);
-        mine.gfx.destroy();
-        mines.splice(m, 1);
-        break;
-      }
-    }
   }
 }
