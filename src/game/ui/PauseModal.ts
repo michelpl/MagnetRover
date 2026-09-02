@@ -3,6 +3,7 @@ import { ignoreWorldCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
 import { Save } from '../save/Save';
 import { bindViewResize, viewSize } from './viewSize';
+import { VolumeSliderPair } from './volumeSliders';
 
 type PauseItem = {
   bg: GameObjects.Rectangle;
@@ -10,15 +11,15 @@ type PauseItem = {
 };
 
 /**
- * Full-screen overlay: Continue resumes, Quit returns to the menu, mute toggles persist.
+ * Full-screen overlay: volume sliders, haptics, Continue, and Quit.
  */
 export class PauseModal {
   private readonly root: GameObjects.Container;
   private readonly dim: GameObjects.Rectangle;
-  private readonly sfxLabel: GameObjects.Text;
+  private readonly volumes: VolumeSliderPair;
   private readonly hapticsLabel: GameObjects.Text;
   private readonly items: PauseItem[] = [];
-  private focusIndex = 2;
+  private focusIndex = 1;
 
   public constructor(
     scene: Scene,
@@ -27,16 +28,18 @@ export class PauseModal {
     const { width, height } = viewSize(scene);
     const cx = width / 2;
     const cy = height / 2;
+    const settings = GameConfig.settings;
+    const sliderLeft = cx - settings.sliderWidth / 2;
 
     this.dim = scene.add
       .rectangle(0, 0, width, height, 0x0d0d10, 0.82)
       .setOrigin(0, 0);
 
-    const panel = scene.add.rectangle(cx, cy, 720, 760, 0x1e1e26, 1);
+    const panel = scene.add.rectangle(cx, cy, 840, 980, 0x1e1e26, 1);
     panel.setStrokeStyle(4, GameConfig.colors.mapBorder);
 
     const title = scene.add
-      .text(cx, cy - 300, 'Paused', {
+      .text(cx, cy - 430, 'Paused', {
         fontFamily: GameConfig.ui.fontFamily,
         fontSize: '64px',
         color: '#74c0fc',
@@ -45,15 +48,14 @@ export class PauseModal {
       })
       .setOrigin(0.5);
 
-    const sfxBtn = this.makeButton(scene, cx, cy - 140, '', GameConfig.colors.roverCabin, () => {
-      Save.update((data) => {
-        data.sfxMuted = !data.sfxMuted;
-      });
-      this.refreshToggles();
+    this.volumes = new VolumeSliderPair(scene, {
+      left: sliderLeft,
+      width: settings.sliderWidth,
+      sfxY: cy - 280,
+      musicY: cy - 100,
     });
-    this.sfxLabel = sfxBtn.label;
 
-    const hapticsBtn = this.makeButton(scene, cx, cy - 20, '', GameConfig.colors.roverCabin, () => {
+    const hapticsBtn = this.makeButton(scene, cx, cy + 80, '', GameConfig.colors.roverCabin, () => {
       Save.update((data) => {
         data.hapticsEnabled = !data.hapticsEnabled;
       });
@@ -64,7 +66,7 @@ export class PauseModal {
     const continueBtn = this.makeButton(
       scene,
       cx,
-      cy + 140,
+      cy + 220,
       'Continue',
       GameConfig.colors.magnetGlow,
       handlers.onContinue,
@@ -72,7 +74,7 @@ export class PauseModal {
     const quitBtn = this.makeButton(
       scene,
       cx,
-      cy + 260,
+      cy + 340,
       'Quit',
       GameConfig.colors.roverCabin,
       handlers.onQuit,
@@ -82,7 +84,7 @@ export class PauseModal {
       this.dim,
       panel,
       title,
-      ...sfxBtn.parts,
+      ...this.volumes.objects,
       ...hapticsBtn.parts,
       ...continueBtn.parts,
       ...quitBtn.parts,
@@ -101,8 +103,9 @@ export class PauseModal {
   }
 
   public show(): void {
+    this.volumes.refreshFromSave();
     this.refreshToggles();
-    this.focusIndex = 2;
+    this.focusIndex = 1;
     this.setOpen(true);
     this.refreshFocus();
   }
@@ -168,6 +171,7 @@ export class PauseModal {
   private setOpen(open: boolean): void {
     this.root.setVisible(open);
     this.root.setActive(open);
+    this.volumes.setInputEnabled(open);
     for (const child of this.root.list) {
       if (child.input) {
         child.input.enabled = open;
@@ -182,7 +186,6 @@ export class PauseModal {
 
   private refreshToggles(): void {
     const save = Save.load();
-    this.sfxLabel.setText(save.sfxMuted ? 'SFX: Off' : 'SFX: On');
     this.hapticsLabel.setText(save.hapticsEnabled ? 'Haptics: On' : 'Haptics: Off');
   }
 
