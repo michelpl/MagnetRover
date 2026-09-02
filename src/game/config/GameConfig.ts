@@ -229,10 +229,10 @@ export const GameConfig = {
     /** World Y of the rover, aligned to the painted pad on garage-bg (cover-fit). */
     showcaseY: 762,
     roverDisplaySize: 260,
-    cardsTop: 930,
+    cardsTop: 900,
     cardWidth: 984,
-    cardHeight: 168,
-    cardGap: 14,
+    cardHeight: 136,
+    cardGap: 8,
     cardRadius: 18,
     iconSize: 96,
     buySize: 92,
@@ -389,27 +389,41 @@ export const GameConfig = {
     muzzleFlashMs: 50,
     /** Forward arc (degrees) for laser auto-aim. Player facing sets the cone; shots snap to targets inside it. */
     fireConeDeg: 120,
+    /** Max local yaw step toward aim, Phaser RotateTo units per ~16.7ms. */
+    cannonYawRate: 0.55,
     /** Packed frames in `assets/sprites/weapons/laser_cannon.png` (8×4). */
     cannonDirectionCount: 32,
     cannonSpriteFrameSize: 256,
     /** Same mapping as the rover hull: 256 source at rover ortho_scale. */
     cannonDisplaySize: 44,
-    /** Local Y of the cannon mount (negative = toward the hull front). */
-    cannonOffsetY: -6,
-    /** Hull-local offset of the weapon disc (same space as the baked hull sprite). */
-    weaponBaseOffsetX: 0,
-    weaponBaseOffsetY: -6,
+    /**
+     * Rover-local mount (negative Y = toward the hull front).
+     * Base and barrel share this point so they stay stacked while the hull yaws.
+     */
+    cannonOffsetX: 0,
+    cannonOffsetY: -3,
     /** Local Y of the barrel tip relative to the cannon origin. */
-    cannonMuzzleLocalY: -8,
+    cannonMuzzleLocalY: -13,
     laserMuzzleOffset: 28,
-    laserDashLength: 22,
-    laserDashWidth: 5,
-    laserColor: 0xff4d6d,
+    laserGlow: {
+      textureKey: 'laser-glow',
+      textureSize: 64,
+      stops: [
+        { t: 0, hex: '#E0FFFF', alpha: 1 },
+        { t: 0.22, hex: '#00E5FF', alpha: 0.95 },
+        { t: 0.55, hex: '#00BFFF', alpha: 0.45 },
+        { t: 1, hex: '#0040A0', alpha: 0 },
+      ] as readonly { t: number; hex: string; alpha: number }[],
+      boltWidth: 22,
+      boltHeight: 5,
+      muzzleSize: 16,
+      sparkSize: 16,
+    },
     laserHitRadius: 16,
     spawnMinEnemySeparation: 48,
     hitSparkRadius: 8,
     hitSparkDurationMs: 120,
-    stageCoinBonus: [10, 15, 20, 25, 35] as readonly number[],
+    stageCoinBonus: [10, 15, 20, 25, 35, 45, 55, 70, 85, 110] as readonly number[],
   },
   roverUpgrades: {
     hp: { values: [100, 120, 145, 175] as readonly number[], costs: [12, 30, 70] as readonly number[] },
@@ -419,6 +433,10 @@ export const GameConfig = {
   weaponUpgradeConfig: {
     maxTier: 3,
     costs: [12, 30, 70] as readonly number[],
+  },
+  laserCadence: {
+    values: [420, 320, 240, 180] as readonly number[],
+    costs: [40, 110, 250] as readonly number[],
   },
   hudSurvival: {
     hpBarWidth: 420,

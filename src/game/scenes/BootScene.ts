@@ -3,6 +3,7 @@ import { Audio } from '../audio/Audio';
 import { GameConfig } from '../config/GameConfig';
 import { getObstacleVisual, OBSTACLE_VARIANTS } from '../config/Obstacles';
 import { SplashScreen } from '../ui/SplashScreen';
+import { ensureLaserGlowTexture } from '../entities/laserGlowTexture';
 
 export class BootScene extends Scene {
   public constructor() {
@@ -71,6 +72,7 @@ export class BootScene extends Scene {
     await document.fonts.ready;
     registerIconsetFrames(this);
     knockoutNearBlack(this, 'stage-lock');
+    ensureLaserGlowTexture(this);
     Audio.bind(this);
     this.scene.start('MenuScene');
   }

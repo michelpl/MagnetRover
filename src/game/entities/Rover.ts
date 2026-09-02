@@ -84,18 +84,15 @@ export class Rover extends GameObjects.Container {
     const display = Math.max(bodyWidth, bodyHeight);
     this.hull = new GameObjects.Sprite(scene, 0, 0, 'rover', 0);
     this.hull.setDisplaySize(display, display);
-    const { weaponBaseOffsetX, weaponBaseOffsetY, cannonDisplaySize } = GameConfig.survival;
-    this.weaponBase = new GameObjects.Sprite(scene, weaponBaseOffsetX, weaponBaseOffsetY, 'weapon-base', 0);
+    const { cannonOffsetX, cannonOffsetY, cannonDisplaySize } = GameConfig.survival;
+    this.weaponBase = new GameObjects.Sprite(scene, cannonOffsetX, cannonOffsetY, 'weapon-base', 0);
     this.weaponBase.setDisplaySize(cannonDisplaySize, cannonDisplaySize);
     this.treadFx = new RoverTreadFx(scene);
-    this.hullLayer = new GameObjects.Container(scene, 0, 0, [
-      this.hull,
-      this.weaponBase,
-      this.treadFx,
-    ]);
+    this.hullLayer = new GameObjects.Container(scene, 0, 0, [this.hull, this.treadFx]);
     this.dustFx = new DustTrailFx(scene, 'player');
     this.cannon = new LaserCannon(scene);
     this.add(this.hullLayer);
+    this.add(this.weaponBase);
     this.add(this.cannon);
     this.syncHullFrame();
     scene.add.existing(this);
@@ -265,6 +262,7 @@ export class Rover extends GameObjects.Container {
     const frame = angleToRoverFrame(facing);
     this.hull.setFrame(frame);
     this.weaponBase.setFrame(frame);
+    this.weaponBase.setRotation(-this.rotation);
     this.hullLayer.setRotation(-this.rotation);
     // Hull art is pre-rotated in the sheet; the layer cancels container yaw so the
     // cannon can still turn in world space. Tread FX is procedural, so it must be

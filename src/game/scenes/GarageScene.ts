@@ -35,6 +35,7 @@ export class GarageScene extends Scene {
       { type: 'rover' as const, line: 'speed' as const },
       { type: 'rover' as const, line: 'armor' as const },
       ...WEAPON_IDS.map((weaponId) => ({ type: 'weapon' as const, weaponId })),
+      { type: 'cadence' as const },
     ];
 
     this.cards = lines.map(

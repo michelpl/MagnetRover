@@ -69,6 +69,30 @@ export const Upgrades = {
     Save.write(data);
     return true;
   },
+
+  cadenceTier(data: SaveData = Save.load()): number {
+    return data.laserCadenceTier;
+  },
+
+  cadenceNextCost(data: SaveData = Save.load()): number | null {
+    const tier = Upgrades.cadenceTier(data);
+    if (tier >= GameConfig.laserCadence.values.length - 1) {
+      return null;
+    }
+    return GameConfig.laserCadence.costs[tier] ?? null;
+  },
+
+  purchaseCadence(): boolean {
+    const data = Save.load();
+    const cost = Upgrades.cadenceNextCost(data);
+    if (cost === null || data.coins < cost) {
+      return false;
+    }
+    data.coins -= cost;
+    data.laserCadenceTier = Upgrades.cadenceTier(data) + 1;
+    Save.write(data);
+    return true;
+  },
 };
 
 function clampTier(level: number, length: number): number {
