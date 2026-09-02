@@ -64,8 +64,8 @@ IMPORT_AXIS_UP = "Y"
 
 # Disc diameter as a fraction of rover XY body width (concept: ~1/3–1/2 of roof).
 BASE_DIAMETER_FRAC = 0.38
-# Cannon max XY relative to scaled disc diameter (length overhangs the disc).
-CANNON_SIZE_FRAC = 1.05
+# Cannon max XY relative to scaled disc diameter (housing fills most of the disc).
+CANNON_SIZE_FRAC = 1.7
 # Sit the assembly slightly above the rover AABB top so it does not z-fight.
 ROOF_GAP = 0.04
 
@@ -503,11 +503,14 @@ def main() -> None:
     base_xy = xy_size(base_mins, base_maxs)
     cannon_scale = scale_to_target_xy(cannon, base_xy * CANNON_SIZE_FRAC)
 
-    # Keep the normalize XY correction; only lift onto the roof / disc.
+    # Disc and barrel share the same XY axis (disc hole). Do not AABB-center
+    # the cannon or the barrel midpoint drifts off the mount.
     place_bottom_at_z(base, roof_z)
-    place_bottom_at_z(cannon, root_bbox(base)[1].z)
     recenter_xy(base)
-    recenter_xy(cannon)
+    place_bottom_at_z(cannon, root_bbox(base)[1].z)
+    cannon.location.x = base.location.x
+    cannon.location.y = base.location.y
+    bpy.context.view_layer.update()
 
     look_at = bpy.data.objects.new("Sprite_LookAt", None)
     bpy.context.scene.collection.objects.link(look_at)
