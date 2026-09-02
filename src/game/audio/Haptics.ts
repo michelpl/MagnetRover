@@ -1,30 +1,21 @@
+import { Capacitor } from '@capacitor/core';
 import { Save } from '../save/Save';
 
 /**
- * Light haptics via Capacitor on native builds; navigator.vibrate on web (US-036).
+ * Light haptics via Capacitor on native builds. Web skips vibration.
  */
 export const Haptics = {
   vibrate(durationMs = 12): void {
-    if (!Save.load().hapticsEnabled) {
+    if (!Capacitor.isNativePlatform() || !Save.load().hapticsEnabled) {
       return;
     }
     void Haptics.vibrateAsync(durationMs);
   },
 
-  async vibrateAsync(durationMs = 12): Promise<void> {
+  async vibrateAsync(_durationMs = 12): Promise<void> {
     try {
-      const cap = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
-      if (cap?.isNativePlatform?.()) {
-        const { Haptics: CapHaptics, ImpactStyle } = await import('@capacitor/haptics');
-        await CapHaptics.impact({ style: ImpactStyle.Light });
-        return;
-      }
-      const nav = globalThis.navigator as Navigator & {
-        vibrate?: (pattern: number | number[]) => boolean;
-      };
-      if (typeof nav.vibrate === 'function') {
-        nav.vibrate(durationMs);
-      }
+      const { Haptics: CapHaptics, ImpactStyle } = await import('@capacitor/haptics');
+      await CapHaptics.impact({ style: ImpactStyle.Light });
     } catch {
       // Haptics unavailable — ignore.
     }
