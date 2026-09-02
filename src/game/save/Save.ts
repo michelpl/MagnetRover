@@ -1,6 +1,6 @@
 import { DEFAULT_STARTER_WEAPONS, type WeaponId, WEAPON_UNLOCK_ORDER } from '../config/Weapons';
 import { getMaxStageId, getNextStageId } from '../config/Stages';
-import { isDebugMode } from '../config/GameConfig';
+import { GameConfig, isDebugMode } from '../config/GameConfig';
 
 export type RoverUpgradeLevels = {
   hp: number;
@@ -23,11 +23,14 @@ export type SaveData = {
   currentLevel: number;
   tutorialDone: boolean;
   sfxMuted: boolean;
+  sfxVolume: number;
+  musicVolume: number;
   hapticsEnabled: boolean;
   ownedWeapons: WeaponId[];
   loadout: (WeaponId | null)[];
   weaponUpgrades: WeaponUpgradeLevels;
   roverUpgrades: RoverUpgradeLevels;
+  laserCadenceTier: number;
 };
 
 const SAVE_KEY = 'magnetRoverSaveV2';
@@ -39,11 +42,14 @@ const DEFAULT_SAVE: SaveData = {
   currentLevel: 1,
   tutorialDone: false,
   sfxMuted: false,
+  sfxVolume: GameConfig.settings.initialVolume,
+  musicVolume: GameConfig.settings.initialVolume,
   hapticsEnabled: true,
   ownedWeapons: [...DEFAULT_STARTER_WEAPONS],
   loadout: [DEFAULT_STARTER_WEAPONS[0] ?? null, null, null, null],
   weaponUpgrades: {},
   roverUpgrades: { hp: 0, speed: 0, armor: 0 },
+  laserCadenceTier: 0,
 };
 
 function parseWeaponId(value: unknown): WeaponId | null {
@@ -106,8 +112,11 @@ function migrateLegacySave(parsed: Record<string, unknown>): SaveData {
       : data.currentLevel;
   data.tutorialDone = typeof parsed.tutorialDone === 'boolean' ? parsed.tutorialDone : false;
   data.sfxMuted = typeof parsed.sfxMuted === 'boolean' ? parsed.sfxMuted : false;
+  data.sfxVolume = parseVolume(parsed.sfxVolume, data.sfxMuted);
+  data.musicVolume = parseVolume(parsed.musicVolume, false);
   data.hapticsEnabled =
     typeof parsed.hapticsEnabled === 'boolean' ? parsed.hapticsEnabled : true;
+  data.laserCadenceTier = parseCadenceTier(parsed.laserCadenceTier);
   return data;
 }
 
@@ -117,11 +126,14 @@ function cloneDefaults(): SaveData {
     currentLevel: DEFAULT_SAVE.currentLevel,
     tutorialDone: DEFAULT_SAVE.tutorialDone,
     sfxMuted: DEFAULT_SAVE.sfxMuted,
+    sfxVolume: DEFAULT_SAVE.sfxVolume,
+    musicVolume: DEFAULT_SAVE.musicVolume,
     hapticsEnabled: DEFAULT_SAVE.hapticsEnabled,
     ownedWeapons: [...DEFAULT_SAVE.ownedWeapons],
     loadout: [...DEFAULT_SAVE.loadout],
     weaponUpgrades: { ...DEFAULT_SAVE.weaponUpgrades },
     roverUpgrades: { ...DEFAULT_SAVE.roverUpgrades },
+    laserCadenceTier: DEFAULT_SAVE.laserCadenceTier,
   };
 }
 
@@ -131,6 +143,21 @@ function clampCurrentLevel(id: number): number {
     return 1;
   }
   return Math.min(max, Math.max(1, Math.floor(id)));
+}
+
+function parseVolume(value: unknown, mutedFallback: boolean): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.min(1, value));
+  }
+  return mutedFallback ? 0 : GameConfig.settings.initialVolume;
+}
+
+function parseCadenceTier(value: unknown): number {
+  const max = GameConfig.laserCadence.values.length - 1;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(max, Math.floor(value)));
 }
 
 /** localStorage save/load — survival shape with legacy migration. */
@@ -213,6 +240,8 @@ function normalizeSave(parsed: SaveData): SaveData {
     currentLevel: clampCurrentLevel(parsed.currentLevel),
     tutorialDone: parsed.tutorialDone ?? false,
     sfxMuted: parsed.sfxMuted ?? false,
+    sfxVolume: parseVolume(parsed.sfxVolume, parsed.sfxMuted ?? false),
+    musicVolume: parseVolume(parsed.musicVolume, false),
     hapticsEnabled: parsed.hapticsEnabled ?? true,
     ownedWeapons: parseOwnedWeapons(parsed.ownedWeapons),
     loadout: parseLoadout(parsed.loadout),
@@ -222,5 +251,6 @@ function normalizeSave(parsed: SaveData): SaveData {
       speed: parsed.roverUpgrades?.speed ?? 0,
       armor: parsed.roverUpgrades?.armor ?? 0,
     },
+    laserCadenceTier: parseCadenceTier(parsed.laserCadenceTier),
   };
 }

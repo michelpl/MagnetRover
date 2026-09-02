@@ -25,7 +25,7 @@ const WEAPONS: Record<WeaponId, WeaponDefinition> = {
     fireRateMs: 420,
     range: 460,
     projectileSpeed: 740,
-    burstCount: 4,
+    burstCount: 1,
     burstIntervalMs: 50,
   },
 };
@@ -52,4 +52,10 @@ export function scaledWeaponDamage(id: WeaponId, tier: number): number {
   const base = getWeaponDefinition(id).damage;
   const bonus = tier * GameConfig.survival.weaponUpgradeDamagePerTier;
   return base + bonus;
+}
+
+export function scaledLaserFireRateMs(tier: number): number {
+  const { values } = GameConfig.laserCadence;
+  const index = Math.max(0, Math.min(tier, values.length - 1));
+  return values[index] ?? values[0] ?? 420;
 }

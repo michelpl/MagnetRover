@@ -1,4 +1,5 @@
 import { Geom, Input, Scene } from 'phaser';
+import { Capacitor } from '@capacitor/core';
 import { Audio } from '../audio/Audio';
 import { GameConfig, isDebugMode } from '../config/GameConfig';
 import { getObstacleVisual } from '../config/Obstacles';
@@ -127,6 +128,7 @@ export class GameScene extends Scene {
       this.combatSystem,
       survivalLoadout(),
       save.weaponUpgrades,
+      save.laserCadenceTier,
       this.obstacleColliders,
     );
 
@@ -217,6 +219,7 @@ export class GameScene extends Scene {
       this.stage.mapWidth,
       this.stage.mapHeight,
       this.saveData.weaponUpgrades,
+      this.saveData.laserCadenceTier,
     );
 
     this.hpBar.setRatio(this.hpSystem.ratio);
@@ -249,6 +252,9 @@ export class GameScene extends Scene {
   }
 
   private shakeCamera(): void {
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
     const cam = this.cameras.main;
     const intensity = GameConfig.survival.killShakeIntensity;
     this.tweens.add({

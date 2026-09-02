@@ -1,6 +1,6 @@
 import { GameObjects, Geom, Scene } from 'phaser';
 import { GameConfig } from '../config/GameConfig';
-import { getWeaponDefinition, type WeaponId } from '../config/Weapons';
+import { getWeaponDefinition, scaledLaserFireRateMs, type WeaponId } from '../config/Weapons';
 import { Audio } from '../audio/Audio';
 import { Haptics } from '../audio/Haptics';
 import { Save, type SaveData } from '../save/Save';
@@ -10,7 +10,8 @@ import { setContainerInteractive } from './setContainerInteractive';
 
 export type UpgradeCardKind =
   | { type: 'rover'; line: RoverUpgradeLine }
-  | { type: 'weapon'; weaponId: WeaponId };
+  | { type: 'weapon'; weaponId: WeaponId }
+  | { type: 'cadence' };
 
 /** One garage upgrade row for rover stats or weapon damage tiers. */
 export class UpgradeCard {
@@ -113,7 +114,9 @@ export class UpgradeCard {
     const bought =
       this.kind.type === 'rover'
         ? Upgrades.purchaseRover(this.kind.line)
-        : Upgrades.purchaseWeapon(this.kind.weaponId);
+        : this.kind.type === 'weapon'
+          ? Upgrades.purchaseWeapon(this.kind.weaponId)
+          : Upgrades.purchaseCadence();
     if (!bought) {
       this.shake();
       return;
@@ -153,7 +156,10 @@ export class UpgradeCard {
     if (this.kind.type === 'rover') {
       return Upgrades.roverNextCost(this.kind.line, data.roverUpgrades);
     }
-    return Upgrades.weaponNextCost(this.kind.weaponId, data);
+    if (this.kind.type === 'weapon') {
+      return Upgrades.weaponNextCost(this.kind.weaponId, data);
+    }
+    return Upgrades.cadenceNextCost(data);
   }
 
   private valueLabel(data: SaveData): string {
@@ -167,8 +173,11 @@ export class UpgradeCard {
       }
       return String(applied.armor);
     }
-    const tier = Upgrades.weaponTier(this.kind.weaponId, data);
-    return `Tier ${tier}`;
+    if (this.kind.type === 'weapon') {
+      const tier = Upgrades.weaponTier(this.kind.weaponId, data);
+      return `Tier ${tier}`;
+    }
+    return `${scaledLaserFireRateMs(Upgrades.cadenceTier(data))} ms`;
   }
 
   private cardTitle(): string {
@@ -186,7 +195,10 @@ export class UpgradeCard {
         }
       }
     }
-    return getWeaponDefinition(this.kind.weaponId).name;
+    if (this.kind.type === 'weapon') {
+      return getWeaponDefinition(this.kind.weaponId).name;
+    }
+    return 'Laser cadence';
   }
 
   private drawBuy(maxed: boolean, affordable: boolean, cost: number | null): void {

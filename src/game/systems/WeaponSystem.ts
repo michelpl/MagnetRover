@@ -1,13 +1,14 @@
 import type { WeaponId } from '../config/Weapons';
-import { getWeaponDefinition, scaledWeaponDamage } from '../config/Weapons';
+import { getWeaponDefinition, scaledLaserFireRateMs, scaledWeaponDamage } from '../config/Weapons';
 import { pickNearestTargetableEnemy } from '../combat/targeting';
 import { GameConfig } from '../config/GameConfig';
 import type { Enemy } from '../entities/Enemy';
+import { ensureLaserGlowTexture } from '../entities/laserGlowTexture';
 import { ProjectilePool } from '../entities/Projectile';
 import type { Rover } from '../entities/Rover';
 import { Audio } from '../audio/Audio';
 import type { CombatSystem } from './CombatSystem';
-import { GameObjects, Geom, Scene } from 'phaser';
+import { BlendModes, GameObjects, Geom, Scene } from 'phaser';
 
 type WeaponSlot = {
   id: WeaponId;
@@ -16,12 +17,12 @@ type WeaponSlot = {
   burstCooldownMs: number;
 };
 
-/** Auto-fires the laser cannon: sequential dashes aimed at the nearest enemy in the forward cone. */
+/** Auto-fires the laser cannon: one glow bolt aimed at the nearest enemy in the forward cone. */
 export class WeaponSystem {
   private readonly slots: WeaponSlot[] = [];
   private readonly projectilePool: ProjectilePool;
   private muzzleFlashMs = 0;
-  private readonly muzzleGfx: GameObjects.Arc;
+  private readonly muzzleGfx: GameObjects.Image;
 
   public constructor(
     private readonly scene: Scene,
@@ -29,10 +30,17 @@ export class WeaponSystem {
     private readonly combat: CombatSystem,
     loadout: readonly (WeaponId | null)[],
     weaponTiers: Readonly<Partial<Record<WeaponId, number>>>,
+    laserCadenceTier: number,
     obstacleRects: readonly Geom.Rectangle[],
   ) {
     this.projectilePool = new ProjectilePool(scene, obstacleRects);
-    this.muzzleGfx = scene.add.circle(0, 0, 8, 0xffc9c9, 0.95);
+    const glowKey = ensureLaserGlowTexture(scene);
+    this.muzzleGfx = scene.add.image(0, 0, glowKey);
+    this.muzzleGfx.setDisplaySize(
+      GameConfig.survival.laserGlow.muzzleSize,
+      GameConfig.survival.laserGlow.muzzleSize,
+    );
+    this.muzzleGfx.setBlendMode(BlendModes.ADD);
     this.muzzleGfx.setDepth(600);
     this.muzzleGfx.setVisible(false);
 
@@ -51,8 +59,7 @@ export class WeaponSystem {
     }
 
     for (const slot of this.slots) {
-      const def = getWeaponDefinition(slot.id);
-      slot.cooldownMs = def.fireRateMs * 0.5;
+      slot.cooldownMs = scaledLaserFireRateMs(laserCadenceTier) * 0.5;
       void weaponTiers;
     }
   }
@@ -63,6 +70,7 @@ export class WeaponSystem {
     mapWidth: number,
     mapHeight: number,
     weaponTiers: Readonly<Partial<Record<WeaponId, number>>>,
+    laserCadenceTier: number,
   ): void {
     if (this.muzzleFlashMs > 0) {
       this.muzzleFlashMs = Math.max(0, this.muzzleFlashMs - delta);
@@ -82,6 +90,8 @@ export class WeaponSystem {
       aimTarget
         ? Math.atan2(aimTarget.x - this.rover.x, -(aimTarget.y - this.rover.y))
         : null,
+      this.rover.rotation,
+      delta,
     );
 
     for (const slot of this.slots) {
@@ -125,7 +135,7 @@ export class WeaponSystem {
         continue;
       }
       this.fireLaser(def, damage, target);
-      slot.cooldownMs = def.fireRateMs;
+      slot.cooldownMs = scaledLaserFireRateMs(laserCadenceTier);
       slot.burstRemaining = Math.max(0, def.burstCount - 1);
       slot.burstCooldownMs = def.burstIntervalMs;
     }

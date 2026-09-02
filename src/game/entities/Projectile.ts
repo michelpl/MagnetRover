@@ -1,9 +1,10 @@
-import { GameObjects, Geom, Scene } from 'phaser';
+import { BlendModes, GameObjects, Geom, Scene } from 'phaser';
 import { ignoreUiCamera } from '../cameras/GameCameras';
 import { GameConfig } from '../config/GameConfig';
+import { ensureLaserGlowTexture } from './laserGlowTexture';
 
 type ActiveProjectile = {
-  gfx: GameObjects.Rectangle;
+  gfx: GameObjects.Image;
   x: number;
   y: number;
   vx: number;
@@ -13,7 +14,7 @@ type ActiveProjectile = {
   active: boolean;
 };
 
-/** Pooled laser dashes — no physics plugin. */
+/** Pooled laser bolts — radial glow texture, no physics plugin. */
 export class ProjectilePool {
   private readonly pool: ActiveProjectile[] = [];
   private readonly obstacleRects: Geom.Rectangle[];
@@ -23,9 +24,12 @@ export class ProjectilePool {
     obstacleRects: readonly Geom.Rectangle[],
   ) {
     this.obstacleRects = [...obstacleRects];
-    const { projectilePoolSize, laserDashLength, laserDashWidth, laserColor } = GameConfig.survival;
+    const key = ensureLaserGlowTexture(scene);
+    const { projectilePoolSize, laserGlow } = GameConfig.survival;
     for (let i = 0; i < projectilePoolSize; i += 1) {
-      const gfx = scene.add.rectangle(0, 0, laserDashLength, laserDashWidth, laserColor, 1);
+      const gfx = scene.add.image(0, 0, key);
+      gfx.setDisplaySize(laserGlow.boltWidth, laserGlow.boltHeight);
+      gfx.setBlendMode(BlendModes.ADD);
       gfx.setVisible(false);
       gfx.setDepth(500);
       ignoreUiCamera(scene, gfx);
