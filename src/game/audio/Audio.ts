@@ -24,6 +24,7 @@ let boundScene: Scene | null = null;
 export const Audio = {
   bind(scene: Scene): void {
     boundScene = scene;
+    Audio.applySavedVolumes();
   },
 
   /**
@@ -36,18 +37,24 @@ export const Audio = {
     }
   },
 
+  applySavedVolumes(): void {
+    // BGM will read Save.musicVolume when a music clip exists.
+    // Do not set SoundManager.volume — that is a master fader and would scale SFX too.
+  },
+
   play(key: SfxKey, volume = 0.45): void {
     try {
       if (!boundScene) {
         return;
       }
-      if (Save.load().sfxMuted) {
+      const save = Save.load();
+      if (save.sfxVolume <= 0 || save.sfxMuted) {
         return;
       }
       if (!boundScene.cache.audio.exists(key)) {
         return;
       }
-      boundScene.sound.play(key, { volume });
+      boundScene.sound.play(key, { volume: volume * save.sfxVolume });
     } catch {
       // Never break a run for audio failures.
     }
