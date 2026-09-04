@@ -1,0 +1,17 @@
+{
+  "name": "Magnet Rover",
+  "install": "npm ci",
+  "terminals": [
+    {
+      "name": "dev server",
+      "command": "npm run dev",
+      "description": "Vite dev server for the Phaser game. Serves the game at http://localhost:8082 with hot module reload."
+    }
+  ],
+  "ports": [
+    {
+      "name": "vite dev server",
+      "port": 8082
+    }
+  ]
+}
